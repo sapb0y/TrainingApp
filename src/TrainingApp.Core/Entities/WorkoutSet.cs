@@ -14,17 +14,16 @@ public class WorkoutSet
     public int? ActualReps { get; set; }
     public decimal? ActualWeight { get; set; }
     public decimal? Rpe { get; set; }
+    public int? Rir { get; set; }
     public bool IsWarmup { get; set; }
-    public DateTime? CompletedAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? PerformedAt { get; set; }
 
     /// <summary>
-    /// Estimated 1RM using Brzycki formula: weight * (36 / (37 - reps))
+    /// Estimated 1RM using Epley formula: weight * (1 + reps/30)
     /// </summary>
-    public decimal? CalculateE1Rm()
-    {
-        if (ActualWeight is null || ActualReps is null || ActualReps < 1 || ActualReps > 36)
-            return null;
-
-        return ActualWeight.Value * (36m / (37m - ActualReps.Value));
-    }
+    public decimal? EstimatedOneRepMax =>
+        ActualWeight is null || ActualReps is null || ActualReps < 1 || ActualReps > 30
+            ? null
+            : ActualWeight.Value * (1 + ActualReps.Value / 30m);
 }
