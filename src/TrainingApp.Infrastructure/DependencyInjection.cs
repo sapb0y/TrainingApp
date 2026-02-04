@@ -2,8 +2,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Polly;
+using Polly.Extensions.Http;
+using Refit;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
+using TrainingApp.Infrastructure.External.Wger;
+using TrainingApp.Infrastructure.Services;
 
 namespace TrainingApp.Infrastructure;
 
@@ -29,6 +35,35 @@ public static class DependencyInjection
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<TrainingAppDbContext>();
 
+        // Memory cache
+        services.AddMemoryCache();
+
+        // Wger API client with Polly policies
+        var wgerBaseUrl = configuration["Wger:BaseUrl"] ?? "https://wger.de/api/v2/";
+
+        services.AddRefitClient<IWgerApi>()
+            .ConfigureHttpClient(c => c.BaseAddress = new Uri(wgerBaseUrl))
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+
+        services.AddScoped<IWgerClient, WgerClient>();
+        services.AddScoped<IExerciseCacheService, ExerciseCacheService>();
+
         return services;
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .WaitAndRetryAsync(3, retryAttempt =>
+                TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
     }
 }
