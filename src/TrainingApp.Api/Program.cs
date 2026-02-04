@@ -1,3 +1,4 @@
+using TrainingApp.Api.Endpoints;
 using TrainingApp.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,5 +14,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapExerciseEndpoints();
+app.MapWorkoutEndpoints();
 
 app.Run();
