@@ -39,7 +39,7 @@ public static class DependencyInjection
         services.AddMemoryCache();
 
         // Wger API client with Polly policies
-        var wgerBaseUrl = configuration["Wger:BaseUrl"] ?? "https://wger.de/api/v2/";
+        var wgerBaseUrl = configuration["Wger:BaseUrl"] ?? "https://wger.de/api/v2";
 
         services.AddRefitClient<IWgerApi>()
             .ConfigureHttpClient(c => c.BaseAddress = new Uri(wgerBaseUrl))
