@@ -50,6 +50,7 @@ docker-compose.override.yml
 ## Environment
 .env
 .env.*
+!.env.example
 appsettings.*.json
 !appsettings.json
 !appsettings.Development.json

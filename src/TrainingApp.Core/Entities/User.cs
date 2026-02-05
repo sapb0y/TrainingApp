@@ -1,13 +1,13 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace TrainingApp.Core.Entities;
 
-public class User
+public class User : IdentityUser<Guid>
 {
-    public Guid Id { get; set; }
-    public required string Email { get; set; }
     public required string DisplayName { get; set; }
     public UserSettings Settings { get; set; } = new();
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? LastLoginAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Workout> Workouts { get; set; } = [];
 }
