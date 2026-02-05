@@ -1,11 +1,23 @@
+using FluentValidation;
 using HealthChecks.NpgSql;
 using TrainingApp.Api.Endpoints;
 using TrainingApp.Api.Health;
+using TrainingApp.Api.Middleware;
+using TrainingApp.Api.Services;
+using TrainingApp.Api.Validators;
+using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// HTTP Context accessor for CurrentUserService
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+// FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<CreateWorkoutRequestValidator>();
 
 // OpenAPI + Swagger
 builder.Services.AddOpenApi();
@@ -22,6 +34,9 @@ builder.Services.AddHealthChecks()
     .AddCheck<WgerHealthCheck>("wger");
 
 var app = builder.Build();
+
+// Exception handling middleware (must be first)
+app.UseExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {
