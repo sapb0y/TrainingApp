@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using TrainingApp.Core.Entities;
 using TrainingApp.Infrastructure.Data;
@@ -37,8 +38,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                 services.Remove(descriptor);
 
             // Add DbContext with test container connection string
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(_postgres.GetConnectionString());
+            dataSourceBuilder.EnableDynamicJson();
+            var dataSource = dataSourceBuilder.Build();
+
             services.AddDbContext<TrainingAppDbContext>(options =>
-                options.UseNpgsql(_postgres.GetConnectionString()));
+                options.UseNpgsql(dataSource));
 
             // Ensure database is created and migrated
             var sp = services.BuildServiceProvider();

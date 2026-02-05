@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Polly;
 using Polly.Extensions.Http;
 using Refit;
@@ -20,8 +21,12 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+        dataSourceBuilder.EnableDynamicJson();
+        var dataSource = dataSourceBuilder.Build();
+
         services.AddDbContext<TrainingAppDbContext>(options =>
-            options.UseNpgsql(connectionString));
+            options.UseNpgsql(dataSource));
 
         services.AddIdentityCore<User>(options =>
             {
