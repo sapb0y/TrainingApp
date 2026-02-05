@@ -4,7 +4,7 @@ services:
     container_name: trainingapp-db
     environment:
       POSTGRES_USER: trainingapp
-      POSTGRES_PASSWORD: trainingapp_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trainingapp_dev}
       POSTGRES_DB: trainingapp
     ports:
       - "5432:5432"
