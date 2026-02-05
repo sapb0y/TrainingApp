@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Api.Contracts;
+using TrainingApp.Api.Filters;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Exceptions;
+using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
 
 namespace TrainingApp.Api.Endpoints;
@@ -22,11 +25,13 @@ public static class WorkoutEndpoints
 
         group.MapPost("/", Create)
             .WithName("CreateWorkout")
-            .WithSummary("Create a new workout");
+            .WithSummary("Create a new workout")
+            .WithValidation<CreateWorkoutRequest>();
 
         group.MapPut("/{id:guid}", Update)
             .WithName("UpdateWorkout")
-            .WithSummary("Update an existing workout");
+            .WithSummary("Update an existing workout")
+            .WithValidation<UpdateWorkoutRequest>();
 
         group.MapDelete("/{id:guid}", Delete)
             .WithName("DeleteWorkout")
@@ -39,25 +44,29 @@ public static class WorkoutEndpoints
 
         group.MapPost("/{id:guid}/sets", CreateSet)
             .WithName("CreateWorkoutSet")
-            .WithSummary("Add a set to a workout");
+            .WithSummary("Add a set to a workout")
+            .WithValidation<CreateWorkoutSetRequest>();
 
         group.MapPut("/{id:guid}/sets/{setId:guid}", UpdateSet)
             .WithName("UpdateWorkoutSet")
-            .WithSummary("Update a workout set");
+            .WithSummary("Update a workout set")
+            .WithValidation<UpdateWorkoutSetRequest>();
 
         group.MapDelete("/{id:guid}/sets/{setId:guid}", DeleteSet)
             .WithName("DeleteWorkoutSet")
             .WithSummary("Delete a workout set");
     }
 
-    // TODO: Replace with actual user ID from auth
-    private static readonly Guid TempUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-
-    private static async Task<IResult> GetAll(TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetAll(
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workouts = await db.Workouts
             .AsNoTracking()
-            .Where(w => w.UserId == TempUserId)
+            .Where(w => w.UserId == userId)
             .OrderByDescending(w => w.ScheduledAt)
             .Select(w => new WorkoutSummaryResponse(
                 w.Id,
@@ -70,25 +79,38 @@ public static class WorkoutEndpoints
         return Results.Ok(new WorkoutListResponse(workouts, workouts.Count));
     }
 
-    private static async Task<IResult> GetById(Guid id, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetById(
+        Guid id,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workout = await db.Workouts
             .AsNoTracking()
             .Include(w => w.Sets)
             .ThenInclude(s => s.Exercise)
-            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
 
-        return workout is null
-            ? Results.NotFound()
-            : Results.Ok(ToResponse(workout));
+        if (workout is null)
+            throw new NotFoundException("Workout", id.ToString());
+
+        return Results.Ok(ToResponse(workout));
     }
 
-    private static async Task<IResult> Create(CreateWorkoutRequest req, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> Create(
+        CreateWorkoutRequest req,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workout = new Workout
         {
             Id = Guid.NewGuid(),
-            UserId = TempUserId,
+            UserId = userId,
             Name = req.Name,
             ScheduledAt = req.ScheduledAt,
             Notes = req.Notes,
@@ -101,15 +123,22 @@ public static class WorkoutEndpoints
         return Results.Created($"/api/v1/workouts/{workout.Id}", ToResponse(workout));
     }
 
-    private static async Task<IResult> Update(Guid id, UpdateWorkoutRequest req, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> Update(
+        Guid id,
+        UpdateWorkoutRequest req,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workout = await db.Workouts
             .Include(w => w.Sets)
             .ThenInclude(s => s.Exercise)
-            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
 
         if (workout is null)
-            return Results.NotFound();
+            throw new NotFoundException("Workout", id.ToString());
 
         if (req.Name is not null) workout.Name = req.Name;
         if (req.ScheduledAt.HasValue) workout.ScheduledAt = req.ScheduledAt.Value;
@@ -121,44 +150,63 @@ public static class WorkoutEndpoints
         return Results.Ok(ToResponse(workout));
     }
 
-    private static async Task<IResult> Delete(Guid id, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> Delete(
+        Guid id,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workout = await db.Workouts
-            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
 
         if (workout is null)
-            return Results.NotFound();
+            throw new NotFoundException("Workout", id.ToString());
 
         db.Workouts.Remove(workout);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
     }
 
-    private static async Task<IResult> GetSets(Guid id, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetSets(
+        Guid id,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workout = await db.Workouts
             .AsNoTracking()
             .Include(w => w.Sets)
             .ThenInclude(s => s.Exercise)
-            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
 
         if (workout is null)
-            return Results.NotFound();
+            throw new NotFoundException("Workout", id.ToString());
 
         return Results.Ok(workout.Sets.OrderBy(s => s.SetNumber).Select(ToSetResponse));
     }
 
-    private static async Task<IResult> CreateSet(Guid id, CreateWorkoutSetRequest req, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> CreateSet(
+        Guid id,
+        CreateWorkoutSetRequest req,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var workout = await db.Workouts
-            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
 
         if (workout is null)
-            return Results.NotFound("Workout not found");
+            throw new NotFoundException("Workout", id.ToString());
 
         var exercise = await db.Exercises.FindAsync([req.ExerciseId], ct);
         if (exercise is null)
-            return Results.NotFound("Exercise not found");
+            throw new NotFoundException("Exercise", req.ExerciseId.ToString());
 
         var set = new WorkoutSet
         {
@@ -178,15 +226,23 @@ public static class WorkoutEndpoints
         return Results.Created($"/api/v1/workouts/{id}/sets/{set.Id}", ToSetResponse(set));
     }
 
-    private static async Task<IResult> UpdateSet(Guid id, Guid setId, UpdateWorkoutSetRequest req, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> UpdateSet(
+        Guid id,
+        Guid setId,
+        UpdateWorkoutSetRequest req,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var set = await db.WorkoutSets
             .Include(s => s.Exercise)
             .Include(s => s.Workout)
-            .FirstOrDefaultAsync(s => s.Id == setId && s.WorkoutId == id && s.Workout!.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(s => s.Id == setId && s.WorkoutId == id && s.Workout!.UserId == userId, ct);
 
         if (set is null)
-            return Results.NotFound();
+            throw new NotFoundException("WorkoutSet", setId.ToString());
 
         if (req.TargetReps.HasValue) set.TargetReps = req.TargetReps.Value;
         if (req.TargetWeight.HasValue) set.TargetWeight = req.TargetWeight.Value;
@@ -202,14 +258,21 @@ public static class WorkoutEndpoints
         return Results.Ok(ToSetResponse(set));
     }
 
-    private static async Task<IResult> DeleteSet(Guid id, Guid setId, TrainingAppDbContext db, CancellationToken ct)
+    private static async Task<IResult> DeleteSet(
+        Guid id,
+        Guid setId,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
     {
+        var userId = currentUser.UserId;
+
         var set = await db.WorkoutSets
             .Include(s => s.Workout)
-            .FirstOrDefaultAsync(s => s.Id == setId && s.WorkoutId == id && s.Workout!.UserId == TempUserId, ct);
+            .FirstOrDefaultAsync(s => s.Id == setId && s.WorkoutId == id && s.Workout!.UserId == userId, ct);
 
         if (set is null)
-            return Results.NotFound();
+            throw new NotFoundException("WorkoutSet", setId.ToString());
 
         db.WorkoutSets.Remove(set);
         await db.SaveChangesAsync(ct);
