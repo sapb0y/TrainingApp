@@ -23,6 +23,14 @@ public class WorkoutEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetWorkouts_ReturnsEmptyList_WhenNoWorkouts()
     {
+        // Arrange - clear any workouts from other tests
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrainingAppDbContext>();
+            db.Workouts.RemoveRange(db.Workouts);
+            await db.SaveChangesAsync();
+        }
+
         // Act
         var response = await _client.GetAsync("/api/v1/workouts");
 
