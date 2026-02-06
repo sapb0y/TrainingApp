@@ -17,6 +17,7 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<ProgramWorkout> ProgramWorkouts => Set<ProgramWorkout>();
     public DbSet<ProgramExercise> ProgramExercises => Set<ProgramExercise>();
     public DbSet<MuscleVolumeTarget> MuscleVolumeTargets => Set<MuscleVolumeTarget>();
+    public DbSet<AdaptationLog> AdaptationLogs => Set<AdaptationLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

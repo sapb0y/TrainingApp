@@ -19,7 +19,11 @@ public class WorkoutSetConfiguration : IEntityTypeConfiguration<WorkoutSet>
         builder.Property(s => s.Rpe)
             .HasPrecision(3, 1);
 
+        builder.Property(s => s.AdjustmentReason)
+            .HasMaxLength(500);
+
         builder.Ignore(s => s.EstimatedOneRepMax);
+        builder.Ignore(s => s.RirDrift);
 
         builder.HasOne(s => s.Workout)
             .WithMany(w => w.Sets)
