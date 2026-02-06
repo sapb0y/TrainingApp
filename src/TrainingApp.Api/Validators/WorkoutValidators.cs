@@ -56,6 +56,10 @@ public class CreateWorkoutSetRequestValidator : AbstractValidator<CreateWorkoutS
         RuleFor(x => x.TargetWeight)
             .GreaterThan(0).WithMessage("Target weight must be greater than 0")
             .When(x => x.TargetWeight.HasValue);
+
+        RuleFor(x => x.TargetRir)
+            .InclusiveBetween(0, 10).WithMessage("Target RIR must be between 0 and 10")
+            .When(x => x.TargetRir.HasValue);
     }
 }
 
@@ -86,5 +90,37 @@ public class UpdateWorkoutSetRequestValidator : AbstractValidator<UpdateWorkoutS
         RuleFor(x => x.Rir)
             .InclusiveBetween(0, 10).WithMessage("RIR must be between 0 and 10")
             .When(x => x.Rir.HasValue);
+
+        RuleFor(x => x.TargetRir)
+            .InclusiveBetween(0, 10).WithMessage("Target RIR must be between 0 and 10")
+            .When(x => x.TargetRir.HasValue);
+    }
+}
+
+public class StartWorkoutRequestValidator : AbstractValidator<StartWorkoutRequest>
+{
+    public StartWorkoutRequestValidator()
+    {
+        RuleFor(x => x.PreWorkoutReadiness)
+            .InclusiveBetween(1, 10).WithMessage("Pre-workout readiness must be between 1 and 10")
+            .When(x => x.PreWorkoutReadiness.HasValue);
+    }
+}
+
+public class CompleteWorkoutRequestValidator : AbstractValidator<CompleteWorkoutRequest>
+{
+    public CompleteWorkoutRequestValidator()
+    {
+        RuleFor(x => x.SessionRpe)
+            .InclusiveBetween(1, 10).WithMessage("Session RPE must be between 1 and 10")
+            .When(x => x.SessionRpe.HasValue);
+
+        RuleFor(x => x.PostWorkoutFatigue)
+            .InclusiveBetween(1, 10).WithMessage("Post-workout fatigue must be between 1 and 10")
+            .When(x => x.PostWorkoutFatigue.HasValue);
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(2000).WithMessage("Notes cannot exceed 2000 characters")
+            .When(x => x.Notes is not null);
     }
 }

@@ -15,7 +15,10 @@ public class WorkoutSet
     public decimal? ActualWeight { get; set; }
     public decimal? Rpe { get; set; }
     public int? Rir { get; set; }
+    public int? TargetRir { get; set; }
     public bool IsWarmup { get; set; }
+    public bool WasAutoAdjusted { get; set; }
+    public string? AdjustmentReason { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset? PerformedAt { get; set; }
 
@@ -26,4 +29,7 @@ public class WorkoutSet
         ActualWeight is null || ActualReps is null || ActualReps < 1 || ActualReps > 30
             ? null
             : ActualWeight.Value * (1 + ActualReps.Value / 30m);
+
+    public int? RirDrift =>
+        Rir.HasValue && TargetRir.HasValue ? Rir.Value - TargetRir.Value : null;
 }

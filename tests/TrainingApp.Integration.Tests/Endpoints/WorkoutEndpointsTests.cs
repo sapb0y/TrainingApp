@@ -140,7 +140,7 @@ public class WorkoutEndpointsTests : IClassFixture<CustomWebApplicationFactory>
             exerciseId = exercise.Id;
         }
 
-        var setRequest = new CreateWorkoutSetRequest(exerciseId, 1, 10, 100m, false);
+        var setRequest = new CreateWorkoutSetRequest(exerciseId, 1, 10, 100m, null, false);
 
         // Act
         var response = await _client.PostAsJsonAsync($"/api/v1/workouts/{workout!.Id}/sets", setRequest);

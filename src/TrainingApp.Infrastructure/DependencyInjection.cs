@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IWgerClient, WgerClient>();
         services.AddScoped<IExerciseCacheService, ExerciseCacheService>();
         services.AddScoped<IProgramGeneratorService, ProgramGeneratorService>();
+        services.AddScoped<IAutoregulationExecutionService, AutoregulationExecutionService>();
 
         return services;
     }

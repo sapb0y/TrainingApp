@@ -11,7 +11,11 @@ public record WorkoutSetResponse(
     decimal? ActualWeight,
     decimal? Rpe,
     int? Rir,
+    int? TargetRir,
+    int? RirDrift,
     bool IsWarmup,
+    bool WasAutoAdjusted,
+    string? AdjustmentReason,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? PerformedAt,
     decimal? EstimatedOneRepMax);
@@ -21,6 +25,7 @@ public record CreateWorkoutSetRequest(
     int SetNumber,
     int? TargetReps,
     decimal? TargetWeight,
+    int? TargetRir,
     bool IsWarmup = false);
 
 public record UpdateWorkoutSetRequest(
@@ -30,6 +35,7 @@ public record UpdateWorkoutSetRequest(
     decimal? ActualWeight,
     decimal? Rpe,
     int? Rir,
+    int? TargetRir,
     bool? IsWarmup,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? PerformedAt);

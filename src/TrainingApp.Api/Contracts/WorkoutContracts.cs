@@ -12,6 +12,8 @@ public record WorkoutResponse(
     string? Notes,
     string Status,
     int? SessionRpe,
+    int? PreWorkoutReadiness,
+    int? PostWorkoutFatigue,
     DateTimeOffset CreatedAt,
     List<WorkoutSetResponse> Sets);
 

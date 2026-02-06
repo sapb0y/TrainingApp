@@ -37,6 +37,26 @@ public static class WorkoutEndpoints
             .WithName("DeleteWorkout")
             .WithSummary("Delete a workout");
 
+        // Workout lifecycle
+        group.MapPost("/{id:guid}/start", StartWorkout)
+            .WithName("StartWorkout")
+            .WithSummary("Start a workout")
+            .WithValidation<StartWorkoutRequest>();
+
+        group.MapPost("/{id:guid}/complete", CompleteWorkout)
+            .WithName("CompleteWorkout")
+            .WithSummary("Complete a workout")
+            .WithValidation<CompleteWorkoutRequest>();
+
+        // Autoregulation
+        group.MapGet("/{id:guid}/recommendations", GetRecommendations)
+            .WithName("GetWorkoutRecommendations")
+            .WithSummary("Get autoregulation recommendations for a workout");
+
+        group.MapGet("/{id:guid}/adaptation-log", GetAdaptationLog)
+            .WithName("GetAdaptationLog")
+            .WithSummary("Get adaptation log entries for a workout");
+
         // Workout Sets
         group.MapGet("/{id:guid}/sets", GetSets)
             .WithName("GetWorkoutSets")
@@ -169,6 +189,105 @@ public static class WorkoutEndpoints
         return Results.NoContent();
     }
 
+    private static async Task<IResult> StartWorkout(
+        Guid id,
+        StartWorkoutRequest req,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
+    {
+        var userId = currentUser.UserId;
+
+        var workout = await db.Workouts
+            .Include(w => w.Sets)
+            .ThenInclude(s => s.Exercise)
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
+
+        if (workout is null)
+            throw new NotFoundException("Workout", id.ToString());
+
+        workout.Status = WorkoutStatus.InProgress;
+        workout.StartedAt = DateTimeOffset.UtcNow;
+        workout.PreWorkoutReadiness = req.PreWorkoutReadiness;
+
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(ToResponse(workout));
+    }
+
+    private static async Task<IResult> CompleteWorkout(
+        Guid id,
+        CompleteWorkoutRequest req,
+        ICurrentUserService currentUser,
+        TrainingAppDbContext db,
+        CancellationToken ct)
+    {
+        var userId = currentUser.UserId;
+
+        var workout = await db.Workouts
+            .Include(w => w.Sets)
+            .ThenInclude(s => s.Exercise)
+            .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId, ct);
+
+        if (workout is null)
+            throw new NotFoundException("Workout", id.ToString());
+
+        workout.Status = WorkoutStatus.Completed;
+        workout.CompletedAt = DateTimeOffset.UtcNow;
+        workout.SessionRpe = req.SessionRpe;
+        workout.PostWorkoutFatigue = req.PostWorkoutFatigue;
+        if (req.Notes is not null) workout.Notes = req.Notes;
+
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(ToResponse(workout));
+    }
+
+    private static async Task<IResult> GetRecommendations(
+        Guid id,
+        ICurrentUserService currentUser,
+        IAutoregulationExecutionService autoregService,
+        TrainingAppDbContext db,
+        CancellationToken ct)
+    {
+        var userId = currentUser.UserId;
+
+        // Verify ownership
+        var exists = await db.Workouts.AnyAsync(w => w.Id == id && w.UserId == userId, ct);
+        if (!exists)
+            throw new NotFoundException("Workout", id.ToString());
+
+        var evaluation = await autoregService.GetRecommendationsAsync(id, ct);
+
+        var response = new WorkoutRecommendationsResponse(
+            evaluation.Exercises.Select(e => new ExerciseRecommendationResponse(
+                e.ExerciseId,
+                db.Exercises.AsNoTracking().FirstOrDefault(ex => ex.Id == e.ExerciseId)?.Name ?? "Unknown",
+                e.Volume.ToString(),
+                e.NextSet is not null ? new NextSetResponse(e.NextSet.Weight, e.NextSet.Reps, e.NextSet.TargetRir) : null,
+                e.Reason)).ToList(),
+            evaluation.SessionNote);
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetAdaptationLog(
+        Guid id,
+        ICurrentUserService currentUser,
+        IAutoregulationExecutionService autoregService,
+        TrainingAppDbContext db,
+        CancellationToken ct)
+    {
+        var userId = currentUser.UserId;
+
+        var exists = await db.Workouts.AnyAsync(w => w.Id == id && w.UserId == userId, ct);
+        if (!exists)
+            throw new NotFoundException("Workout", id.ToString());
+
+        var logs = await autoregService.GetAdaptationLogAsync(id, ct);
+
+        return Results.Ok(logs.Select(l => new AdaptationLogResponse(
+            l.Id, l.RuleName, l.Scope, l.InputSummary, l.OutputSummary, l.WasApplied, l.CreatedAt)));
+    }
+
     private static async Task<IResult> GetSets(
         Guid id,
         ICurrentUserService currentUser,
@@ -216,6 +335,7 @@ public static class WorkoutEndpoints
             SetNumber = req.SetNumber,
             TargetReps = req.TargetReps,
             TargetWeight = req.TargetWeight,
+            TargetRir = req.TargetRir,
             IsWarmup = req.IsWarmup,
             Exercise = exercise
         };
@@ -250,6 +370,7 @@ public static class WorkoutEndpoints
         if (req.ActualWeight.HasValue) set.ActualWeight = req.ActualWeight.Value;
         if (req.Rpe.HasValue) set.Rpe = req.Rpe.Value;
         if (req.Rir.HasValue) set.Rir = req.Rir.Value;
+        if (req.TargetRir.HasValue) set.TargetRir = req.TargetRir.Value;
         if (req.IsWarmup.HasValue) set.IsWarmup = req.IsWarmup.Value;
         if (req.CompletedAt.HasValue) set.CompletedAt = req.CompletedAt.Value;
         if (req.PerformedAt.HasValue) set.PerformedAt = req.PerformedAt.Value;
@@ -289,6 +410,8 @@ public static class WorkoutEndpoints
         w.Notes,
         w.Status.ToString(),
         w.SessionRpe,
+        w.PreWorkoutReadiness,
+        w.PostWorkoutFatigue,
         w.CreatedAt,
         w.Sets.OrderBy(s => s.SetNumber).Select(ToSetResponse).ToList());
 
@@ -303,7 +426,11 @@ public static class WorkoutEndpoints
         s.ActualWeight,
         s.Rpe,
         s.Rir,
+        s.TargetRir,
+        s.RirDrift,
         s.IsWarmup,
+        s.WasAutoAdjusted,
+        s.AdjustmentReason,
         s.CompletedAt,
         s.PerformedAt,
         s.EstimatedOneRepMax);
