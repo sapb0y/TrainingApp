@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using TrainingApp.Api.Contracts;
 using TrainingApp.Core.Entities;
@@ -20,13 +21,23 @@ public class ProgramEndpointsTests : IClassFixture<CustomWebApplicationFactory>
         _client = factory.CreateClient();
     }
 
+    private void InvalidateExerciseCache()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
+        cache.Remove("exercises_all");
+    }
+
     private async Task SeedExercisesAsync()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TrainingAppDbContext>();
 
         if (await db.Exercises.AnyAsync())
+        {
+            InvalidateExerciseCache();
             return;
+        }
 
         var exercises = new[]
         {
@@ -50,6 +61,7 @@ public class ProgramEndpointsTests : IClassFixture<CustomWebApplicationFactory>
 
         db.Exercises.AddRange(exercises);
         await db.SaveChangesAsync();
+        InvalidateExerciseCache();
     }
 
     private async Task<ProgramResponse> GenerateTestProgramAsync(string template = "PushPullLegs", int weeks = 12)
@@ -175,19 +187,23 @@ public class ProgramEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GenerateProgram_ReturnsBadRequest_WhenNoExercises()
     {
-        // Clear all exercises
+        // Clear all entities that reference exercises (FK Restrict/Cascade)
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<TrainingAppDbContext>();
-            // Need to clear program exercises first due to FK
             db.ProgramExercises.RemoveRange(db.ProgramExercises);
+            db.WorkoutSets.RemoveRange(db.WorkoutSets);
             await db.SaveChangesAsync();
             db.Exercises.RemoveRange(db.Exercises);
             await db.SaveChangesAsync();
         }
+        InvalidateExerciseCache();
 
         var request = new GenerateProgramRequest("Test", "Hypertrophy", "PushPullLegs", 12, "2025-06-01");
         var response = await _client.PostAsJsonAsync("/api/v1/programs/generate", request);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Re-seed exercises for other tests
+        await SeedExercisesAsync();
     }
 }
