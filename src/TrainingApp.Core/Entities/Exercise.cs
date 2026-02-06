@@ -15,4 +15,5 @@ public class Exercise
     public DateTimeOffset? CachedAt { get; set; }
 
     public ICollection<WorkoutSet> WorkoutSets { get; set; } = [];
+    public ICollection<ProgramExercise> ProgramExercises { get; set; } = [];
 }

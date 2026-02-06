@@ -12,6 +12,8 @@ public class Workout
     public string? Notes { get; set; }
     public WorkoutStatus Status { get; set; } = WorkoutStatus.Planned;
     public int? SessionRpe { get; set; }
+    public Guid? ProgramId { get; set; }
+    public Program? Program { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<WorkoutSet> Sets { get; set; } = [];

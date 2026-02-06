@@ -29,8 +29,16 @@ public class WorkoutConfiguration : IEntityTypeConfiguration<Workout>
             .HasForeignKey(w => w.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(w => w.Program)
+            .WithMany(p => p.Workouts)
+            .HasForeignKey(w => w.ProgramId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(w => new { w.UserId, w.ScheduledAt });
 
         builder.HasIndex(w => w.Status);
+
+        builder.HasIndex(w => w.ProgramId)
+            .HasFilter("program_id IS NOT NULL");
     }
 }
