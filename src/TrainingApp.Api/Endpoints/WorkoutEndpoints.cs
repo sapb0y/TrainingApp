@@ -218,6 +218,7 @@ public static class WorkoutEndpoints
         Guid id,
         CompleteWorkoutRequest req,
         ICurrentUserService currentUser,
+        IFatigueModelService fatigueService,
         TrainingAppDbContext db,
         CancellationToken ct)
     {
@@ -238,6 +239,19 @@ public static class WorkoutEndpoints
         if (req.Notes is not null) workout.Notes = req.Notes;
 
         await db.SaveChangesAsync(ct);
+
+        // Auto-trigger daily metrics update
+        try
+        {
+            var completedDate = DateOnly.FromDateTime(workout.CompletedAt!.Value.UtcDateTime);
+            await fatigueService.UpdateDailyMetricsAsync(userId, completedDate, ct);
+        }
+        catch (Exception)
+        {
+            // Don't fail the workout completion if metrics update fails
+            // DailyMetricsJob will pick it up as backup
+        }
+
         return Results.Ok(ToResponse(workout));
     }
 

@@ -7,10 +7,12 @@ using TrainingApp.Api.Services;
 using TrainingApp.Api.Validators;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure;
+using TrainingApp.Orchestration;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddOrchestration();
 
 // HTTP Context accessor for CurrentUserService
 builder.Services.AddHttpContextAccessor();
@@ -51,6 +53,7 @@ app.MapHealthChecks("/health");
 app.MapExerciseEndpoints();
 app.MapWorkoutEndpoints();
 app.MapProgramEndpoints();
+app.MapFatigueEndpoints();
 
 app.Run();
 

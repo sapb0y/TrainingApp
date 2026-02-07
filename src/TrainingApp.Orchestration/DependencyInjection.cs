@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         services.AddHostedService<ExerciseSyncService>();
         services.AddHostedService<WorkoutReminderService>();
+        services.AddHostedService<DailyMetricsJob>();
 
         return services;
     }
