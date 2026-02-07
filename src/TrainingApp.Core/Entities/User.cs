@@ -13,6 +13,9 @@ public class User : IdentityUser<Guid>
     public ICollection<Program> Programs { get; set; } = [];
     public ICollection<DailyMetrics> DailyMetrics { get; set; } = [];
     public ICollection<RecoveryLog> RecoveryLogs { get; set; } = [];
+    public ICollection<WeightLog> WeightLogs { get; set; } = [];
+    public ICollection<DeficitPhase> DeficitPhases { get; set; } = [];
+    public ICollection<NeatLog> NeatLogs { get; set; } = [];
 }
 
 public class UserSettings
@@ -24,6 +27,11 @@ public class UserSettings
     public TrainingExperience Experience { get; set; } = TrainingExperience.Intermediate;
     public DateOnly? DateOfBirth { get; set; }
     public RecoveryCapacity RecoveryCapacity { get; set; } = RecoveryCapacity.Normal;
+    public BiologicalSex? Sex { get; set; }
+    public decimal? HeightCm { get; set; }
+    public ActivityLevel ActivityLevel { get; set; } = ActivityLevel.Moderate;
+    public WeightGoal WeightGoal { get; set; } = WeightGoal.Maintain;
+    public decimal? TargetWeightKg { get; set; }
 }
 
 public enum TrainingExperience
@@ -39,3 +47,7 @@ public enum RecoveryCapacity
     Normal,
     Low
 }
+
+public enum BiologicalSex { Male, Female }
+public enum ActivityLevel { Sedentary, Light, Moderate, Active, VeryActive }
+public enum WeightGoal { Lose, Maintain, Gain }
