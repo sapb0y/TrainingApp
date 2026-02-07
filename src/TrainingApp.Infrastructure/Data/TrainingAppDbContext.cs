@@ -18,6 +18,8 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<ProgramExercise> ProgramExercises => Set<ProgramExercise>();
     public DbSet<MuscleVolumeTarget> MuscleVolumeTargets => Set<MuscleVolumeTarget>();
     public DbSet<AdaptationLog> AdaptationLogs => Set<AdaptationLog>();
+    public DbSet<DailyMetrics> DailyMetrics => Set<DailyMetrics>();
+    public DbSet<RecoveryLog> RecoveryLogs => Set<RecoveryLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
