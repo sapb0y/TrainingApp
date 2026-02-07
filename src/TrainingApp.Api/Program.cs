@@ -54,6 +54,10 @@ app.MapExerciseEndpoints();
 app.MapWorkoutEndpoints();
 app.MapProgramEndpoints();
 app.MapFatigueEndpoints();
+app.MapWeightEndpoints();
+app.MapDeficitEndpoints();
+app.MapNeatEndpoints();
+app.MapMetabolismEndpoints();
 
 app.Run();
 
