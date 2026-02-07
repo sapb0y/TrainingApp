@@ -20,6 +20,9 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<AdaptationLog> AdaptationLogs => Set<AdaptationLog>();
     public DbSet<DailyMetrics> DailyMetrics => Set<DailyMetrics>();
     public DbSet<RecoveryLog> RecoveryLogs => Set<RecoveryLog>();
+    public DbSet<WeightLog> WeightLogs => Set<WeightLog>();
+    public DbSet<DeficitPhase> DeficitPhases => Set<DeficitPhase>();
+    public DbSet<NeatLog> NeatLogs => Set<NeatLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
