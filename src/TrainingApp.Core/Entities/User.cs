@@ -11,6 +11,8 @@ public class User : IdentityUser<Guid>
 
     public ICollection<Workout> Workouts { get; set; } = [];
     public ICollection<Program> Programs { get; set; } = [];
+    public ICollection<DailyMetrics> DailyMetrics { get; set; } = [];
+    public ICollection<RecoveryLog> RecoveryLogs { get; set; } = [];
 }
 
 public class UserSettings

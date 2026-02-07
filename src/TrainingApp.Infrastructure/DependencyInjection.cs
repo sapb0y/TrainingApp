@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddScoped<IExerciseCacheService, ExerciseCacheService>();
         services.AddScoped<IProgramGeneratorService, ProgramGeneratorService>();
         services.AddScoped<IAutoregulationExecutionService, AutoregulationExecutionService>();
+        services.AddScoped<IFatigueModelService, FatigueModelService>();
 
         return services;
     }
