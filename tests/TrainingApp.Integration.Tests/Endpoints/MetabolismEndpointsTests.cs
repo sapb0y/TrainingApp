@@ -41,10 +41,14 @@ public class MetabolismEndpointsTests : IClassFixture<CustomWebApplicationFactor
         {
             var db = scope.ServiceProvider.GetRequiredService<TrainingAppDbContext>();
             var user = await db.Users.FirstAsync(u => u.Id == TestUserId);
-            user.Settings.Sex = BiologicalSex.Male;
-            user.Settings.HeightCm = 180m;
-            user.Settings.DateOfBirth = new DateOnly(1995, 1, 1);
-            user.Settings.ActivityLevel = ActivityLevel.Moderate;
+            user.Settings = new UserSettings
+            {
+                Sex = BiologicalSex.Male,
+                HeightCm = 180m,
+                DateOfBirth = new DateOnly(1995, 1, 1),
+                ActivityLevel = ActivityLevel.Moderate
+            };
+            db.Entry(user).Property(u => u.Settings).IsModified = true;
             await db.SaveChangesAsync();
         }
 
