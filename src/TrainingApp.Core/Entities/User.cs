@@ -17,6 +17,8 @@ public class User : IdentityUser<Guid>
     public ICollection<DeficitPhase> DeficitPhases { get; set; } = [];
     public ICollection<NeatLog> NeatLogs { get; set; } = [];
     public ICollection<CardioSession> CardioSessions { get; set; } = [];
+    public ICollection<Goal> Goals { get; set; } = [];
+    public ICollection<Insight> Insights { get; set; } = [];
 }
 
 public class UserSettings
