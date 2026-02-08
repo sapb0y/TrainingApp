@@ -12,6 +12,7 @@ namespace TrainingApp.Integration.Tests;
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private static readonly Guid TempUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TestUserBId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
@@ -58,21 +59,43 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseEnvironment("Testing");
     }
 
+    public HttpClient CreatePartnerClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-UserId", TestUserBId.ToString());
+        return client;
+    }
+
     private static void SeedTestUser(TrainingAppDbContext db)
     {
-        if (db.Users.Any(u => u.Id == TempUserId))
-            return;
-
-        db.Users.Add(new User
+        if (!db.Users.Any(u => u.Id == TempUserId))
         {
-            Id = TempUserId,
-            UserName = "testuser",
-            NormalizedUserName = "TESTUSER",
-            Email = "test@example.com",
-            NormalizedEmail = "TEST@EXAMPLE.COM",
-            DisplayName = "Test User",
-            SecurityStamp = Guid.NewGuid().ToString()
-        });
+            db.Users.Add(new User
+            {
+                Id = TempUserId,
+                UserName = "testuser",
+                NormalizedUserName = "TESTUSER",
+                Email = "test@example.com",
+                NormalizedEmail = "TEST@EXAMPLE.COM",
+                DisplayName = "Test User",
+                SecurityStamp = Guid.NewGuid().ToString()
+            });
+        }
+
+        if (!db.Users.Any(u => u.Id == TestUserBId))
+        {
+            db.Users.Add(new User
+            {
+                Id = TestUserBId,
+                UserName = "testpartner",
+                NormalizedUserName = "TESTPARTNER",
+                Email = "partner@example.com",
+                NormalizedEmail = "PARTNER@EXAMPLE.COM",
+                DisplayName = "Test Partner",
+                SecurityStamp = Guid.NewGuid().ToString()
+            });
+        }
+
         db.SaveChanges();
     }
 }
