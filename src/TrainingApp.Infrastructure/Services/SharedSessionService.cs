@@ -84,10 +84,10 @@ public class SharedSessionService : ISharedSessionService
 
         var schedule = PartnerSchedulingService.GenerateSchedule(planA, planB);
 
-        // Persist slots
+        // Persist slots — use _db.Add to ensure EF marks them as Added
         foreach (var block in schedule.Blocks)
         {
-            session.Slots.Add(new SharedSessionSlot
+            var slot = new SharedSessionSlot
             {
                 Id = Guid.NewGuid(),
                 SharedSessionId = sessionId,
@@ -102,7 +102,8 @@ public class SharedSessionService : ISharedSessionService
                 IsParallel = block.UserA.Type == PartnerSchedulingService.ActionType.Work
                              && block.UserB.Type == PartnerSchedulingService.ActionType.Work,
                 EquipmentNote = BuildEquipmentNote(block)
-            });
+            };
+            _db.SharedSessionSlots.Add(slot);
         }
 
         session.EstimatedDurationMinutes = (int)Math.Ceiling(schedule.Summary.TotalSeconds / 60.0);
