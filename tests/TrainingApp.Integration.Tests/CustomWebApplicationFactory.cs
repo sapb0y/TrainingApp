@@ -43,7 +43,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
             var dataSource = dataSourceBuilder.Build();
 
             services.AddDbContext<TrainingAppDbContext>(options =>
-                options.UseNpgsql(dataSource));
+                options.UseNpgsql(dataSource)
+                    .ConfigureWarnings(w => w.Ignore(
+                        Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
             // Ensure database is created and migrated
             var sp = services.BuildServiceProvider();
