@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IFatigueModelService, FatigueModelService>();
         services.AddScoped<IWeightTrackingService, WeightTrackingService>();
         services.AddScoped<IDeficitPhaseService, DeficitPhaseService>();
+        services.AddScoped<ICardioTrackingService, CardioTrackingService>();
 
         return services;
     }

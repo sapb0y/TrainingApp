@@ -16,6 +16,7 @@ public class User : IdentityUser<Guid>
     public ICollection<WeightLog> WeightLogs { get; set; } = [];
     public ICollection<DeficitPhase> DeficitPhases { get; set; } = [];
     public ICollection<NeatLog> NeatLogs { get; set; } = [];
+    public ICollection<CardioSession> CardioSessions { get; set; } = [];
 }
 
 public class UserSettings
@@ -32,6 +33,9 @@ public class UserSettings
     public ActivityLevel ActivityLevel { get; set; } = ActivityLevel.Moderate;
     public WeightGoal WeightGoal { get; set; } = WeightGoal.Maintain;
     public decimal? TargetWeightKg { get; set; }
+    public int? MaxHeartRate { get; set; }
+    public CardioPlacement CardioPlacement { get; set; } = CardioPlacement.After;
+    public int MinSeparationHours { get; set; } = 3;
 }
 
 public enum TrainingExperience
@@ -51,3 +55,6 @@ public enum RecoveryCapacity
 public enum BiologicalSex { Male, Female }
 public enum ActivityLevel { Sedentary, Light, Moderate, Active, VeryActive }
 public enum WeightGoal { Lose, Maintain, Gain }
+public enum CardioModality { Running, Cycling, Rowing, Swimming, Walking, Elliptical, Other }
+public enum CardioIntensityZone { Zone1, Zone2, Zone3, Zone4, Zone5 }
+public enum CardioPlacement { Before, After, Separate }
