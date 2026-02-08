@@ -62,6 +62,8 @@ public static class DependencyInjection
         services.AddScoped<IGoalTrackingService, GoalTrackingService>();
         services.AddScoped<IInsightGeneratorService, InsightGeneratorService>();
         services.AddScoped<IExportService, ExportService>();
+        services.AddScoped<IPartnershipService, PartnershipService>();
+        services.AddScoped<ISharedSessionService, SharedSessionService>();
 
         return services;
     }

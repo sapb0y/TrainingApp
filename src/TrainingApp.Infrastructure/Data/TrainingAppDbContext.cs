@@ -27,6 +27,9 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<Goal> Goals => Set<Goal>();
     public DbSet<GoalCheckpoint> GoalCheckpoints => Set<GoalCheckpoint>();
     public DbSet<Insight> Insights => Set<Insight>();
+    public DbSet<Partnership> Partnerships => Set<Partnership>();
+    public DbSet<SharedSession> SharedSessions => Set<SharedSession>();
+    public DbSet<SharedSessionSlot> SharedSessionSlots => Set<SharedSessionSlot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

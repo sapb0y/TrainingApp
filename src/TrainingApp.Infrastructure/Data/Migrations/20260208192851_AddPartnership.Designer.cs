@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrainingApp.Core.Entities;
@@ -9,12 +10,14 @@ using TrainingApp.Infrastructure.Data;
 
 #nullable disable
 
-namespace TrainingApp.Infrastructure.Migrations
+namespace TrainingApp.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TrainingAppDbContext))]
-    partial class TrainingAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260208192851_AddPartnership")]
+    partial class AddPartnership
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1202,18 +1205,15 @@ namespace TrainingApp.Infrastructure.Migrations
                         .HasColumnName("id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
+                        .HasColumnName("created_at");
 
                     b.Property<int?>("EstimatedDurationMinutes")
                         .HasColumnType("integer")
                         .HasColumnName("estimated_duration_minutes");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasColumnType("text")
                         .HasColumnName("notes");
 
                     b.Property<Guid>("PartnershipId")
@@ -1232,10 +1232,8 @@ namespace TrainingApp.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("solo_estimate_minutes_b");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
                         .HasColumnName("status");
 
                     b.Property<Guid?>("WorkoutAId")
@@ -1249,14 +1247,14 @@ namespace TrainingApp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_shared_sessions");
 
+                    b.HasIndex("PartnershipId")
+                        .HasDatabaseName("i_x_shared_sessions_partnership_id");
+
                     b.HasIndex("WorkoutAId")
                         .HasDatabaseName("i_x_shared_sessions_workout_a_id");
 
                     b.HasIndex("WorkoutBId")
                         .HasDatabaseName("i_x_shared_sessions_workout_b_id");
-
-                    b.HasIndex("PartnershipId", "ScheduledDate")
-                        .HasDatabaseName("i_x_shared_sessions_partnership_id_scheduled_date");
 
                     b.ToTable("shared_sessions");
                 });
@@ -1273,8 +1271,7 @@ namespace TrainingApp.Infrastructure.Migrations
                         .HasColumnName("duration_seconds");
 
                     b.Property<string>("EquipmentNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasColumnType("text")
                         .HasColumnName("equipment_note");
 
                     b.Property<bool>("IsParallel")
@@ -1290,8 +1287,7 @@ namespace TrainingApp.Infrastructure.Migrations
                         .HasColumnName("slot_order");
 
                     b.Property<string>("UserAAction")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                        .HasColumnType("text")
                         .HasColumnName("user_a_action");
 
                     b.Property<Guid?>("UserAExerciseId")
@@ -1303,8 +1299,7 @@ namespace TrainingApp.Infrastructure.Migrations
                         .HasColumnName("user_a_set_number");
 
                     b.Property<string>("UserBAction")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                        .HasColumnType("text")
                         .HasColumnName("user_b_action");
 
                     b.Property<Guid?>("UserBExerciseId")
@@ -1318,8 +1313,8 @@ namespace TrainingApp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_shared_session_slots");
 
-                    b.HasIndex("SharedSessionId", "SlotOrder")
-                        .HasDatabaseName("i_x_shared_session_slots_shared_session_id_slot_order");
+                    b.HasIndex("SharedSessionId")
+                        .HasDatabaseName("i_x_shared_session_slots_shared_session_id");
 
                     b.ToTable("shared_session_slots");
                 });
@@ -1919,13 +1914,11 @@ namespace TrainingApp.Infrastructure.Migrations
                     b.HasOne("TrainingApp.Core.Entities.Workout", "WorkoutA")
                         .WithMany()
                         .HasForeignKey("WorkoutAId")
-                        .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("f_k_shared_sessions__workouts_workout_a_id");
 
                     b.HasOne("TrainingApp.Core.Entities.Workout", "WorkoutB")
                         .WithMany()
                         .HasForeignKey("WorkoutBId")
-                        .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("f_k_shared_sessions__workouts_workout_b_id");
 
                     b.Navigation("Partnership");
