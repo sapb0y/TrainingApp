@@ -58,6 +58,8 @@ app.MapWeightEndpoints();
 app.MapDeficitEndpoints();
 app.MapNeatEndpoints();
 app.MapMetabolismEndpoints();
+app.MapCardioEndpoints();
+app.MapTrainingDayEndpoints();
 
 app.Run();
 
