@@ -24,6 +24,9 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<DeficitPhase> DeficitPhases => Set<DeficitPhase>();
     public DbSet<NeatLog> NeatLogs => Set<NeatLog>();
     public DbSet<CardioSession> CardioSessions => Set<CardioSession>();
+    public DbSet<Goal> Goals => Set<Goal>();
+    public DbSet<GoalCheckpoint> GoalCheckpoints => Set<GoalCheckpoint>();
+    public DbSet<Insight> Insights => Set<Insight>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

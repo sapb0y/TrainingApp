@@ -60,6 +60,11 @@ app.MapNeatEndpoints();
 app.MapMetabolismEndpoints();
 app.MapCardioEndpoints();
 app.MapTrainingDayEndpoints();
+app.MapChartEndpoints();
+app.MapDashboardEndpoints();
+app.MapGoalEndpoints();
+app.MapInsightEndpoints();
+app.MapExportEndpoints();
 
 app.Run();
 
