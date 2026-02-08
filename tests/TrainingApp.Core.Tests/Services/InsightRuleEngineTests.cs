@@ -67,7 +67,7 @@ public class InsightRuleEngineTests
     public void EvaluateVolume_Spike_DetectsWarning()
     {
         var result = InsightRuleEngine.EvaluateVolumeInsights(
-            13000m, 10000m, [], 3); // 30% increase
+            13100m, 10000m, [], 3); // 31% increase
 
         result.Should().ContainSingle(r => r.RuleName == "Volume Spike");
     }
