@@ -14,7 +14,8 @@ public static class CoachActionEndpoints
     public static void MapCoachActionEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/coach")
-            .WithTags("Coach Actions");
+            .WithTags("Coach Actions")
+            .RequireAuthorization();
 
         group.MapPost("/athletes/{id:guid}/programs/generate", GenerateAthleteProgram)
             .WithName("GenerateAthleteProgram")

@@ -11,7 +11,8 @@ public static class ChartEndpoints
     public static void MapChartEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/charts")
-            .WithTags("Charts");
+            .WithTags("Charts")
+            .RequireAuthorization();
 
         group.MapGet("/strength", GetStrengthChart)
             .WithName("GetStrengthChart")

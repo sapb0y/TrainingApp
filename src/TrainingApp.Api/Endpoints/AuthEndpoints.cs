@@ -11,7 +11,8 @@ public static class AuthEndpoints
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/auth")
-            .WithTags("Auth");
+            .WithTags("Auth")
+            .AllowAnonymous();
 
         group.MapPost("/register", Register)
             .WithName("Register")
@@ -34,7 +35,8 @@ public static class AuthEndpoints
 
         group.MapGet("/me", Me)
             .WithName("GetCurrentUser")
-            .WithSummary("Get current user info");
+            .WithSummary("Get current user info")
+            .RequireAuthorization();
     }
 
     private static async Task<IResult> Register(

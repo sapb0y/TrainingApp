@@ -12,7 +12,8 @@ public static class TrainingDayEndpoints
     public static void MapTrainingDayEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/training-day")
-            .WithTags("Training Day");
+            .WithTags("Training Day")
+            .RequireAuthorization();
 
         group.MapGet("/", GetTrainingDaySummary)
             .WithName("GetTrainingDaySummary")

@@ -10,7 +10,8 @@ public static class SharedSessionEndpoints
     public static void MapSharedSessionEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/shared-sessions")
-            .WithTags("Shared Sessions");
+            .WithTags("Shared Sessions")
+            .RequireAuthorization();
 
         group.MapPost("/", CreateSession)
             .WithName("CreateSharedSession")

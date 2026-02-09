@@ -11,7 +11,8 @@ public static class DashboardEndpoints
     public static void MapDashboardEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/dashboard")
-            .WithTags("Dashboard");
+            .WithTags("Dashboard")
+            .RequireAuthorization();
 
         group.MapGet("/summary", GetDashboardSummary)
             .WithName("GetDashboardSummary")

@@ -1,52 +1,34 @@
 using System.Security.Claims;
-using Microsoft.Extensions.Hosting;
 using TrainingApp.Core.Interfaces;
 
 namespace TrainingApp.Api.Services;
 
 public class CurrentUserService : ICurrentUserService
 {
-    private static readonly Guid DefaultUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly IHostEnvironment _env;
 
-    public CurrentUserService(IHttpContextAccessor httpContextAccessor, IHostEnvironment env)
+    public CurrentUserService(IHttpContextAccessor httpContextAccessor)
     {
         _httpContextAccessor = httpContextAccessor;
-        _env = env;
     }
 
     public Guid UserId
     {
         get
         {
-            // Multi-user test support: allow overriding user via header in Testing env
-            var testHeader = _httpContextAccessor.HttpContext?.Request.Headers["X-Test-UserId"].FirstOrDefault();
-            if (_env.IsEnvironment("Testing") && Guid.TryParse(testHeader, out var testUserId))
-                return testUserId;
-
-            var userIdClaim = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = _httpContextAccessor.HttpContext?.User
+                .FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (Guid.TryParse(userIdClaim, out var userId))
                 return userId;
 
-            // Fallback for development/testing until auth is implemented
-            return DefaultUserId;
+            throw new InvalidOperationException("User ID claim not found. Ensure the request is authenticated.");
         }
     }
 
     public bool IsAuthenticated =>
         _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
 
-    public bool IsCoach
-    {
-        get
-        {
-            var roleHeader = _httpContextAccessor.HttpContext?.Request.Headers["X-Test-UserRole"].FirstOrDefault();
-            if (_env.IsEnvironment("Testing") && roleHeader?.Equals("Coach", StringComparison.OrdinalIgnoreCase) == true)
-                return true;
-            return _httpContextAccessor.HttpContext?.User.IsInRole("Coach") ?? false;
-        }
-    }
+    public bool IsCoach =>
+        _httpContextAccessor.HttpContext?.User.IsInRole("Coach") ?? false;
 }

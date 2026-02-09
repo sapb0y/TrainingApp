@@ -13,7 +13,8 @@ public static class WorkoutEndpoints
     public static void MapWorkoutEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/workouts")
-            .WithTags("Workouts");
+            .WithTags("Workouts")
+            .RequireAuthorization();
 
         group.MapGet("/", GetAll)
             .WithName("GetWorkouts")

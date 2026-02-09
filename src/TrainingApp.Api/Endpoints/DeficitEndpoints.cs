@@ -10,7 +10,8 @@ public static class DeficitEndpoints
     public static void MapDeficitEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/deficit")
-            .WithTags("Deficit");
+            .WithTags("Deficit")
+            .RequireAuthorization();
 
         group.MapPost("/start", StartDeficit)
             .WithName("StartDeficit")

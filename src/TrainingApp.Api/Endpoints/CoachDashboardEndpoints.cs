@@ -13,7 +13,8 @@ public static class CoachDashboardEndpoints
     public static void MapCoachDashboardEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/coach")
-            .WithTags("Coach Dashboard");
+            .WithTags("Coach Dashboard")
+            .RequireAuthorization();
 
         group.MapGet("/dashboard", GetDashboard)
             .WithName("GetCoachDashboard")

@@ -8,7 +8,8 @@ public static class ExerciseEndpoints
     public static void MapExerciseEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/exercises")
-            .WithTags("Exercises");
+            .WithTags("Exercises")
+            .RequireAuthorization();
 
         group.MapGet("/", GetAll)
             .WithName("GetExercises")

@@ -11,7 +11,8 @@ public static class CardioEndpoints
     public static void MapCardioEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/cardio")
-            .WithTags("Cardio");
+            .WithTags("Cardio")
+            .RequireAuthorization();
 
         group.MapPost("/", LogCardio)
             .WithName("LogCardio")

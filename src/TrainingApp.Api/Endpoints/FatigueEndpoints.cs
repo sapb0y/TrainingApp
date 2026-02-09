@@ -10,7 +10,8 @@ public static class FatigueEndpoints
     public static void MapFatigueEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/fatigue")
-            .WithTags("Fatigue");
+            .WithTags("Fatigue")
+            .RequireAuthorization();
 
         group.MapGet("/readiness", GetReadiness)
             .WithName("GetReadiness")

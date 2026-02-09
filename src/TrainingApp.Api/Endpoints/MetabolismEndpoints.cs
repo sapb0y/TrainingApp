@@ -12,7 +12,8 @@ public static class MetabolismEndpoints
     public static void MapMetabolismEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/metabolism")
-            .WithTags("Metabolism");
+            .WithTags("Metabolism")
+            .RequireAuthorization();
 
         group.MapGet("/summary", GetMetabolismSummary)
             .WithName("GetMetabolismSummary")
