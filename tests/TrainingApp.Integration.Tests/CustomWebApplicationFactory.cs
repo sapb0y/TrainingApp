@@ -13,6 +13,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 {
     private static readonly Guid TempUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TestUserBId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+    public static readonly Guid TestCoachId = Guid.Parse("00000000-0000-0000-0000-000000000003");
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
@@ -66,6 +67,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         return client;
     }
 
+    public HttpClient CreateCoachClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-UserId", TestCoachId.ToString());
+        client.DefaultRequestHeaders.Add("X-Test-UserRole", "Coach");
+        return client;
+    }
+
     private static void SeedTestUser(TrainingAppDbContext db)
     {
         if (!db.Users.Any(u => u.Id == TempUserId))
@@ -92,6 +101,20 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                 Email = "partner@example.com",
                 NormalizedEmail = "PARTNER@EXAMPLE.COM",
                 DisplayName = "Test Partner",
+                SecurityStamp = Guid.NewGuid().ToString()
+            });
+        }
+
+        if (!db.Users.Any(u => u.Id == TestCoachId))
+        {
+            db.Users.Add(new User
+            {
+                Id = TestCoachId,
+                UserName = "testcoach",
+                NormalizedUserName = "TESTCOACH",
+                Email = "coach@example.com",
+                NormalizedEmail = "COACH@EXAMPLE.COM",
+                DisplayName = "Test Coach",
                 SecurityStamp = Guid.NewGuid().ToString()
             });
         }

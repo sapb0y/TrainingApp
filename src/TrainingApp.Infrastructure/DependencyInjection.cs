@@ -64,6 +64,8 @@ public static class DependencyInjection
         services.AddScoped<IExportService, ExportService>();
         services.AddScoped<IPartnershipService, PartnershipService>();
         services.AddScoped<ISharedSessionService, SharedSessionService>();
+        services.AddScoped<ICoachAthleteService, CoachAthleteService>();
+        services.AddScoped<ICoachAlertAggregatorService, CoachAlertAggregatorService>();
 
         return services;
     }

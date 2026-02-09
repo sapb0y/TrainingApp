@@ -48,3 +48,10 @@ public class ConflictException : DomainException
 
     public ConflictException(string message) : base(message) { }
 }
+
+public class ForbiddenException : DomainException
+{
+    public override string Code => "FORBIDDEN";
+
+    public ForbiddenException(string message) : base(message) { }
+}

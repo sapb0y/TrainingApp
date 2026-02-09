@@ -67,6 +67,9 @@ app.MapInsightEndpoints();
 app.MapExportEndpoints();
 app.MapPartnerEndpoints();
 app.MapSharedSessionEndpoints();
+app.MapCoachEndpoints();
+app.MapCoachDashboardEndpoints();
+app.MapCoachActionEndpoints();
 
 app.Run();
 

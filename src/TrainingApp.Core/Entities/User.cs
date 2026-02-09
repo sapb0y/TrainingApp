@@ -21,6 +21,8 @@ public class User : IdentityUser<Guid>
     public ICollection<Insight> Insights { get; set; } = [];
     public ICollection<Partnership> PartnershipsAsRequester { get; set; } = [];
     public ICollection<Partnership> PartnershipsAsResponder { get; set; } = [];
+    public ICollection<CoachAthlete> CoachRelationshipsAsCoach { get; set; } = [];
+    public ICollection<CoachAthlete> CoachRelationshipsAsAthlete { get; set; } = [];
 }
 
 public class UserSettings

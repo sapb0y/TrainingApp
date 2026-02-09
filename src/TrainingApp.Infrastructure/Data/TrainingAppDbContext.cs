@@ -30,6 +30,8 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<Partnership> Partnerships => Set<Partnership>();
     public DbSet<SharedSession> SharedSessions => Set<SharedSession>();
     public DbSet<SharedSessionSlot> SharedSessionSlots => Set<SharedSessionSlot>();
+    public DbSet<CoachAthlete> CoachAthletes => Set<CoachAthlete>();
+    public DbSet<CoachNote> CoachNotes => Set<CoachNote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
