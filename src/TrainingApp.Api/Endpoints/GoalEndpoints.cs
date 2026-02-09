@@ -10,7 +10,8 @@ public static class GoalEndpoints
     public static void MapGoalEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/goals")
-            .WithTags("Goals");
+            .WithTags("Goals")
+            .RequireAuthorization();
 
         group.MapPost("/", CreateGoal)
             .WithName("CreateGoal")

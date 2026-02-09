@@ -7,7 +7,8 @@ public static class ExportEndpoints
     public static void MapExportEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/export")
-            .WithTags("Export");
+            .WithTags("Export")
+            .RequireAuthorization();
 
         group.MapGet("/workouts", ExportWorkouts)
             .WithName("ExportWorkouts")

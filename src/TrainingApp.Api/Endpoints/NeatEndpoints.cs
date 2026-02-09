@@ -13,7 +13,8 @@ public static class NeatEndpoints
     public static void MapNeatEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/neat")
-            .WithTags("NEAT");
+            .WithTags("NEAT")
+            .RequireAuthorization();
 
         group.MapPost("/", LogNeat)
             .WithName("LogNeat")

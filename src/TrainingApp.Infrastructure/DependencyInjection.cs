@@ -6,6 +6,7 @@ using Npgsql;
 using Polly;
 using Polly.Extensions.Http;
 using Refit;
+using TrainingApp.Core.Configuration;
 using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
@@ -39,6 +40,10 @@ public static class DependencyInjection
             })
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<TrainingAppDbContext>();
+
+        // JWT settings
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Memory cache
         services.AddMemoryCache();

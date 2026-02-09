@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Exceptions;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
 
@@ -21,7 +22,7 @@ public class PartnershipService : IPartnershipService
             p => (p.RequesterId == requesterId || p.ResponderId == requesterId)
                  && p.Status == PartnershipStatus.Active, ct);
         if (hasActive)
-            throw new InvalidOperationException("You already have an active partnership.");
+            throw new ConflictException("You already have an active partnership.");
 
         var code = GenerateCode();
         while (await _db.Partnerships.AnyAsync(p => p.InviteCode == code, ct))
@@ -49,19 +50,19 @@ public class PartnershipService : IPartnershipService
         var partnership = await _db.Partnerships
             .Include(p => p.Requester)
             .FirstOrDefaultAsync(p => p.InviteCode == inviteCode.ToUpperInvariant() && p.Status == PartnershipStatus.Pending, ct)
-            ?? throw new InvalidOperationException("Invite not found or already used.");
+            ?? throw new NotFoundException("Partnership");
 
         if (partnership.ExpiresAt.HasValue && partnership.ExpiresAt.Value < DateTimeOffset.UtcNow)
-            throw new InvalidOperationException("Invite has expired.");
+            throw new ConflictException("Invite has expired.");
 
         if (partnership.RequesterId == responderId)
-            throw new InvalidOperationException("You cannot accept your own invite.");
+            throw new ValidationException("InviteCode", "You cannot accept your own invite.");
 
         var hasActive = await _db.Partnerships.AnyAsync(
             p => (p.RequesterId == responderId || p.ResponderId == responderId)
                  && p.Status == PartnershipStatus.Active, ct);
         if (hasActive)
-            throw new InvalidOperationException("You already have an active partnership.");
+            throw new ConflictException("You already have an active partnership.");
 
         partnership.ResponderId = responderId;
         partnership.Status = PartnershipStatus.Active;
@@ -77,7 +78,7 @@ public class PartnershipService : IPartnershipService
     {
         var partnership = await _db.Partnerships
             .FirstOrDefaultAsync(p => p.InviteCode == inviteCode.ToUpperInvariant() && p.Status == PartnershipStatus.Pending, ct)
-            ?? throw new InvalidOperationException("Invite not found or already used.");
+            ?? throw new NotFoundException("Partnership");
 
         partnership.Status = PartnershipStatus.Ended;
         partnership.UpdatedAt = DateTimeOffset.UtcNow;
@@ -123,10 +124,10 @@ public class PartnershipService : IPartnershipService
             .Include(p => p.SharedSessions)
             .FirstOrDefaultAsync(p => p.Id == partnershipId
                 && (p.RequesterId == userId || p.ResponderId == userId), ct)
-            ?? throw new InvalidOperationException("Partnership not found.");
+            ?? throw new NotFoundException("Partnership");
 
         if (partnership.Status != PartnershipStatus.Active)
-            throw new InvalidOperationException("Partnership is not active.");
+            throw new ConflictException("Partnership is not active.");
 
         partnership.Status = PartnershipStatus.Ended;
         partnership.UpdatedAt = DateTimeOffset.UtcNow;

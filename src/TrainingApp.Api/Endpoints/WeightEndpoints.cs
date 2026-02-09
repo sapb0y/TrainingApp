@@ -10,7 +10,8 @@ public static class WeightEndpoints
     public static void MapWeightEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/weight")
-            .WithTags("Weight");
+            .WithTags("Weight")
+            .RequireAuthorization();
 
         group.MapPost("/", LogWeight)
             .WithName("LogWeight")

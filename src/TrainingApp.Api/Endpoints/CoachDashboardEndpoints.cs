@@ -13,7 +13,8 @@ public static class CoachDashboardEndpoints
     public static void MapCoachDashboardEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/coach")
-            .WithTags("Coach Dashboard");
+            .WithTags("Coach Dashboard")
+            .RequireAuthorization();
 
         group.MapGet("/dashboard", GetDashboard)
             .WithName("GetCoachDashboard")
@@ -49,6 +50,20 @@ public static class CoachDashboardEndpoints
         var alertsByAthlete = alerts.GroupBy(a => a.AthleteId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        var athleteIds = athletes.Where(r => r.AthleteId.HasValue).Select(r => r.AthleteId!.Value).ToList();
+
+        var latestMetricsByUser = await db.DailyMetrics.AsNoTracking()
+            .Where(m => athleteIds.Contains(m.UserId))
+            .GroupBy(m => m.UserId)
+            .Select(g => g.OrderByDescending(m => m.Date).First())
+            .ToDictionaryAsync(m => m.UserId, ct);
+
+        var lastWorkoutByUser = await db.Workouts.AsNoTracking()
+            .Where(w => athleteIds.Contains(w.UserId) && w.Status == WorkoutStatus.Completed)
+            .GroupBy(w => w.UserId)
+            .Select(g => new { UserId = g.Key, Last = g.Max(w => w.CompletedAt) })
+            .ToDictionaryAsync(x => x.UserId, x => x.Last, ct);
+
         var roster = new List<CoachAthleteRosterItem>();
         foreach (var rel in athletes)
         {
@@ -56,11 +71,7 @@ public static class CoachDashboardEndpoints
             var athleteId = rel.AthleteId.Value;
             var athleteName = rel.Athlete?.DisplayName ?? "Unknown";
 
-            var latestMetrics = await db.DailyMetrics
-                .AsNoTracking()
-                .Where(m => m.UserId == athleteId)
-                .OrderByDescending(m => m.Date)
-                .FirstOrDefaultAsync(ct);
+            latestMetricsByUser.TryGetValue(athleteId, out var latestMetrics);
 
             string? readinessCategory = null;
             if (latestMetrics?.ReadinessScore is not null)
@@ -75,12 +86,7 @@ public static class CoachDashboardEndpoints
                 };
             }
 
-            var lastWorkout = await db.Workouts
-                .AsNoTracking()
-                .Where(w => w.UserId == athleteId && w.Status == WorkoutStatus.Completed)
-                .OrderByDescending(w => w.CompletedAt)
-                .Select(w => w.CompletedAt)
-                .FirstOrDefaultAsync(ct);
+            lastWorkoutByUser.TryGetValue(athleteId, out var lastWorkout);
 
             var athleteAlertCount = alertsByAthlete.TryGetValue(athleteId, out var aa) ? aa.Count : 0;
 

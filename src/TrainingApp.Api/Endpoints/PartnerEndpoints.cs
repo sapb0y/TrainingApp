@@ -10,7 +10,8 @@ public static class PartnerEndpoints
     public static void MapPartnerEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/partners")
-            .WithTags("Partners");
+            .WithTags("Partners")
+            .RequireAuthorization();
 
         group.MapPost("/invite", CreateInvite)
             .WithName("CreateInvite")

@@ -14,7 +14,8 @@ public static class CoachActionEndpoints
     public static void MapCoachActionEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/coach")
-            .WithTags("Coach Actions");
+            .WithTags("Coach Actions")
+            .RequireAuthorization();
 
         group.MapPost("/athletes/{id:guid}/programs/generate", GenerateAthleteProgram)
             .WithName("GenerateAthleteProgram")
@@ -126,7 +127,7 @@ public static class CoachActionEndpoints
 
         if (req.TargetReps.HasValue) set.TargetReps = req.TargetReps.Value;
         if (req.TargetWeight.HasValue) set.TargetWeight = req.TargetWeight.Value;
-        if (req.TargetRpe.HasValue) set.TargetRir = (int)Math.Round(10m - req.TargetRpe.Value);
+        if (req.TargetRpe.HasValue) set.TargetRir = (int)Math.Round(10m - req.TargetRpe.Value); // RIR = 10 - RPE per standard convention
 
         set.WasAutoAdjusted = true;
         set.AdjustmentReason = "Modified by coach";
@@ -182,7 +183,7 @@ public static class CoachActionEndpoints
             WorkoutSetId = req.WorkoutSetId
         };
 
-        _db_Add(db, note);
+        db.CoachNotes.Add(note);
         await db.SaveChangesAsync(ct);
 
         var coach = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUser.UserId, ct);
@@ -235,11 +236,6 @@ public static class CoachActionEndpoints
         db.CoachNotes.Remove(note);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
-    }
-
-    private static void _db_Add(TrainingAppDbContext db, CoachNote note)
-    {
-        db.CoachNotes.Add(note);
     }
 
     private static CoachNoteResponse ToNoteResponse(CoachNote n, string coachName) =>

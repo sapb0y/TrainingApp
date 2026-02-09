@@ -175,7 +175,7 @@ public class CoachAlertAggregatorService : ICoachAlertAggregatorService
             if (goal.TargetValue.HasValue && goal.StartValue.HasValue && goal.TargetValue != goal.StartValue)
                 percentComplete = Math.Abs((currentValue - goal.StartValue.Value) / (goal.TargetValue.Value - goal.StartValue.Value) * 100m);
 
-            var goalAlert = CoachAlertEngine.EvaluateGoalStalled(athleteId, athleteName, goal.Title, percentComplete, goal.TargetDate);
+            var goalAlert = CoachAlertEngine.EvaluateGoalStalled(athleteId, athleteName, goal.Title, percentComplete, goal.TargetDate, goal.CreatedDate);
             if (goalAlert is not null) alerts.Add(goalAlert);
         }
 

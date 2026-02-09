@@ -100,7 +100,7 @@ public class SharedSessionEndpointsTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task CreateSession_NonMember_ReturnsError()
+    public async Task CreateSession_NonMember_ReturnsNotFound()
     {
         // Create partnership between client and partner, then try with a different ID
         var partnershipId = await CreateActivePartnership();
@@ -112,6 +112,6 @@ public class SharedSessionEndpointsTests : IClassFixture<CustomWebApplicationFac
         var response = await _client.PostAsJsonAsync("/api/v1/shared-sessions",
             new CreateSharedSessionRequest(partnershipId, "2026-04-06", null, null, null));
 
-        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

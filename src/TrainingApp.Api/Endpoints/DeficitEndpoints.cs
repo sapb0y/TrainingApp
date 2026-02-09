@@ -10,7 +10,8 @@ public static class DeficitEndpoints
     public static void MapDeficitEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/deficit")
-            .WithTags("Deficit");
+            .WithTags("Deficit")
+            .RequireAuthorization();
 
         group.MapPost("/start", StartDeficit)
             .WithName("StartDeficit")
@@ -46,17 +47,10 @@ public static class DeficitEndpoints
     {
         var strategy = Enum.Parse<DeficitStrategy>(req.Strategy, ignoreCase: true);
 
-        try
-        {
-            var phase = await deficitService.StartDeficitAsync(
-                currentUser.UserId, req.StartWeightKg, req.TargetWeightKg,
-                req.WeeklyRateKg, strategy, req.DietBreakIntervalWeeks, req.Notes, ct);
-            return Results.Ok(ToResponse(phase));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Results.Conflict(new { error = ex.Message });
-        }
+        var phase = await deficitService.StartDeficitAsync(
+            currentUser.UserId, req.StartWeightKg, req.TargetWeightKg,
+            req.WeeklyRateKg, strategy, req.DietBreakIntervalWeeks, req.Notes, ct);
+        return Results.Ok(ToResponse(phase));
     }
 
     private static async Task<IResult> GetActiveDeficit(
@@ -73,15 +67,8 @@ public static class DeficitEndpoints
         IDeficitPhaseService deficitService,
         CancellationToken ct)
     {
-        try
-        {
-            var phase = await deficitService.EndDeficitAsync(currentUser.UserId, ct);
-            return Results.Ok(ToResponse(phase));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Results.NotFound(new { error = ex.Message });
-        }
+        var phase = await deficitService.EndDeficitAsync(currentUser.UserId, ct);
+        return Results.Ok(ToResponse(phase));
     }
 
     private static async Task<IResult> PauseDeficit(
@@ -89,15 +76,8 @@ public static class DeficitEndpoints
         IDeficitPhaseService deficitService,
         CancellationToken ct)
     {
-        try
-        {
-            var phase = await deficitService.PauseDeficitAsync(currentUser.UserId, ct);
-            return Results.Ok(ToResponse(phase));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Results.NotFound(new { error = ex.Message });
-        }
+        var phase = await deficitService.PauseDeficitAsync(currentUser.UserId, ct);
+        return Results.Ok(ToResponse(phase));
     }
 
     private static async Task<IResult> ResumeDeficit(
@@ -105,15 +85,8 @@ public static class DeficitEndpoints
         IDeficitPhaseService deficitService,
         CancellationToken ct)
     {
-        try
-        {
-            var phase = await deficitService.ResumeDeficitAsync(currentUser.UserId, ct);
-            return Results.Ok(ToResponse(phase));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Results.NotFound(new { error = ex.Message });
-        }
+        var phase = await deficitService.ResumeDeficitAsync(currentUser.UserId, ct);
+        return Results.Ok(ToResponse(phase));
     }
 
     private static async Task<IResult> GetDeficitHistory(

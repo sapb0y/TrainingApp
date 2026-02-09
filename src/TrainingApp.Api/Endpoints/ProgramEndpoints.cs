@@ -14,7 +14,8 @@ public static class ProgramEndpoints
     public static void MapProgramEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/programs")
-            .WithTags("Programs");
+            .WithTags("Programs")
+            .RequireAuthorization();
 
         group.MapPost("/generate", GenerateProgram)
             .WithName("GenerateProgram")

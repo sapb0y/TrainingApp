@@ -1,10 +1,16 @@
+using System.Text;
 using FluentValidation;
 using HealthChecks.NpgSql;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using TrainingApp.Api.Auth;
 using TrainingApp.Api.Endpoints;
 using TrainingApp.Api.Health;
 using TrainingApp.Api.Middleware;
 using TrainingApp.Api.Services;
 using TrainingApp.Api.Validators;
+using TrainingApp.Core.Configuration;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure;
 using TrainingApp.Orchestration;
@@ -17,6 +23,34 @@ builder.Services.AddOrchestration();
 // HTTP Context accessor for CurrentUserService
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+// Authentication
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddAuthentication("Test")
+        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", null);
+}
+else
+{
+    var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()!;
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtSettings.Issuer,
+                ValidAudience = jwtSettings.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+}
+
+builder.Services.AddAuthorization();
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<CreateWorkoutRequestValidator>();
@@ -48,8 +82,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+app.MapAuthEndpoints();
 app.MapExerciseEndpoints();
 app.MapWorkoutEndpoints();
 app.MapProgramEndpoints();

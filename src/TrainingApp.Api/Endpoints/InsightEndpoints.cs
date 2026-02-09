@@ -8,7 +8,8 @@ public static class InsightEndpoints
     public static void MapInsightEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/insights")
-            .WithTags("Insights");
+            .WithTags("Insights")
+            .RequireAuthorization();
 
         group.MapPost("/generate", GenerateInsights)
             .WithName("GenerateInsights")

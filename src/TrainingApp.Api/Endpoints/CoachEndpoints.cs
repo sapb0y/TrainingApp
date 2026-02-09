@@ -11,7 +11,8 @@ public static class CoachEndpoints
     public static void MapCoachEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/coach")
-            .WithTags("Coach");
+            .WithTags("Coach")
+            .RequireAuthorization();
 
         group.MapPost("/invite", CreateInvite)
             .WithName("CreateCoachInvite")

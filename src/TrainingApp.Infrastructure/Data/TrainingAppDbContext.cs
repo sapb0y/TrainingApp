@@ -32,6 +32,7 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<SharedSessionSlot> SharedSessionSlots => Set<SharedSessionSlot>();
     public DbSet<CoachAthlete> CoachAthletes => Set<CoachAthlete>();
     public DbSet<CoachNote> CoachNotes => Set<CoachNote>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

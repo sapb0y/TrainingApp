@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Exceptions;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Core.Services;
 using TrainingApp.Infrastructure.Data;
@@ -22,7 +23,7 @@ public class SharedSessionService : ISharedSessionService
             .FirstOrDefaultAsync(p => p.Id == partnershipId
                 && p.Status == PartnershipStatus.Active
                 && (p.RequesterId == userId || p.ResponderId == userId), ct)
-            ?? throw new InvalidOperationException("Active partnership not found.");
+            ?? throw new NotFoundException("Partnership");
 
         var session = new SharedSession
         {
@@ -67,7 +68,7 @@ public class SharedSessionService : ISharedSessionService
             .Include(s => s.Slots)
             .FirstOrDefaultAsync(s => s.Id == sessionId
                 && (s.Partnership!.RequesterId == userId || s.Partnership.ResponderId == userId), ct)
-            ?? throw new InvalidOperationException("Shared session not found.");
+            ?? throw new NotFoundException("SharedSession");
 
         // Remove existing slots
         _db.SharedSessionSlots.RemoveRange(session.Slots);
@@ -121,7 +122,7 @@ public class SharedSessionService : ISharedSessionService
             .Include(s => s.Slots)
             .FirstOrDefaultAsync(s => s.Id == sessionId
                 && (s.Partnership!.RequesterId == userId || s.Partnership.ResponderId == userId), ct)
-            ?? throw new InvalidOperationException("Shared session not found.");
+            ?? throw new NotFoundException("SharedSession");
 
         session.Status = SharedSessionStatus.Cancelled;
         _db.SharedSessionSlots.RemoveRange(session.Slots);

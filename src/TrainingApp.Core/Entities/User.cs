@@ -23,6 +23,7 @@ public class User : IdentityUser<Guid>
     public ICollection<Partnership> PartnershipsAsResponder { get; set; } = [];
     public ICollection<CoachAthlete> CoachRelationshipsAsCoach { get; set; } = [];
     public ICollection<CoachAthlete> CoachRelationshipsAsAthlete { get; set; } = [];
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
 }
 
 public class UserSettings
