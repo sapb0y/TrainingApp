@@ -55,6 +55,14 @@ public class ExceptionHandlingMiddleware
                 Type = "https://tools.ietf.org/html/rfc7807#section-6.5.8",
                 Extensions = { ["code"] = ce.Code }
             },
+            ForbiddenException fe => new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Forbidden",
+                Detail = fe.Message,
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                Extensions = { ["code"] = fe.Code }
+            },
             _ => CreateInternalError(exception)
         };
 

@@ -38,4 +38,15 @@ public class CurrentUserService : ICurrentUserService
 
     public bool IsAuthenticated =>
         _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
+
+    public bool IsCoach
+    {
+        get
+        {
+            var roleHeader = _httpContextAccessor.HttpContext?.Request.Headers["X-Test-UserRole"].FirstOrDefault();
+            if (_env.IsEnvironment("Testing") && roleHeader?.Equals("Coach", StringComparison.OrdinalIgnoreCase) == true)
+                return true;
+            return _httpContextAccessor.HttpContext?.User.IsInRole("Coach") ?? false;
+        }
+    }
 }
