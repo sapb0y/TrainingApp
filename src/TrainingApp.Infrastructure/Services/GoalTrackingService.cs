@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Exceptions;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
 
@@ -66,7 +67,7 @@ public class GoalTrackingService : IGoalTrackingService
         var goal = await _db.Goals
             .Include(g => g.Checkpoints)
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct)
-            ?? throw new InvalidOperationException("Goal not found.");
+            ?? throw new NotFoundException("Goal");
 
         if (status.HasValue)
         {
@@ -92,7 +93,7 @@ public class GoalTrackingService : IGoalTrackingService
     {
         var goal = await _db.Goals
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct)
-            ?? throw new InvalidOperationException("Goal not found.");
+            ?? throw new NotFoundException("Goal");
 
         _db.Goals.Remove(goal);
         await _db.SaveChangesAsync(ct);
@@ -102,7 +103,7 @@ public class GoalTrackingService : IGoalTrackingService
     {
         var goal = await _db.Goals
             .FirstOrDefaultAsync(g => g.Id == goalId && g.UserId == userId, ct)
-            ?? throw new InvalidOperationException("Goal not found.");
+            ?? throw new NotFoundException("Goal");
 
         decimal? percentComplete = null;
         if (goal.TargetValue.HasValue && goal.StartValue.HasValue && goal.TargetValue.Value != goal.StartValue.Value)
@@ -132,7 +133,7 @@ public class GoalTrackingService : IGoalTrackingService
         // Verify ownership
         var goalExists = await _db.Goals.AnyAsync(g => g.Id == goalId && g.UserId == userId, ct);
         if (!goalExists)
-            throw new InvalidOperationException("Goal not found.");
+            throw new NotFoundException("Goal");
 
         return await _db.GoalCheckpoints
             .AsNoTracking()

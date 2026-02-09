@@ -64,15 +64,15 @@ public static class CoachAlertEngine
         return null;
     }
 
-    public static CoachAlert? EvaluateGoalStalled(Guid athleteId, string athleteName, string goalTitle, decimal percentComplete, DateOnly? targetDate)
+    public static CoachAlert? EvaluateGoalStalled(Guid athleteId, string athleteName, string goalTitle, decimal percentComplete, DateOnly? targetDate, DateOnly createdDate)
     {
         if (targetDate.HasValue)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var totalDays = targetDate.Value.DayNumber - today.AddDays(-(int)(targetDate.Value.DayNumber - today.DayNumber)).DayNumber;
+            var totalDays = (targetDate.Value.DayNumber - createdDate.DayNumber);
             if (totalDays <= 0) return null;
 
-            var daysElapsed = totalDays - (targetDate.Value.DayNumber - today.DayNumber);
+            var daysElapsed = (today.DayNumber - createdDate.DayNumber);
             if (daysElapsed <= 0) return null;
 
             var expectedProgress = (decimal)daysElapsed / totalDays * 100m;

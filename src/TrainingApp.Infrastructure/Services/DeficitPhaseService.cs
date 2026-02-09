@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Exceptions;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
 
@@ -21,7 +22,7 @@ public class DeficitPhaseService : IDeficitPhaseService
             .FirstOrDefaultAsync(d => d.UserId == userId && d.Status == DeficitPhaseStatus.Active, ct);
 
         if (active is not null)
-            throw new InvalidOperationException("An active deficit phase already exists. End or pause it first.");
+            throw new ConflictException("An active deficit phase already exists. End or pause it first.");
 
         var phase = new DeficitPhase
         {
@@ -53,7 +54,7 @@ public class DeficitPhaseService : IDeficitPhaseService
     {
         var phase = await _db.DeficitPhases
             .FirstOrDefaultAsync(d => d.UserId == userId && d.Status == DeficitPhaseStatus.Active, ct)
-            ?? throw new InvalidOperationException("No active deficit phase found.");
+            ?? throw new NotFoundException("DeficitPhase");
 
         phase.Status = DeficitPhaseStatus.Completed;
         phase.EndDate = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -67,7 +68,7 @@ public class DeficitPhaseService : IDeficitPhaseService
     {
         var phase = await _db.DeficitPhases
             .FirstOrDefaultAsync(d => d.UserId == userId && d.Status == DeficitPhaseStatus.Active, ct)
-            ?? throw new InvalidOperationException("No active deficit phase found.");
+            ?? throw new NotFoundException("DeficitPhase");
 
         phase.Status = DeficitPhaseStatus.Paused;
         phase.UpdatedAt = DateTimeOffset.UtcNow;
@@ -80,7 +81,7 @@ public class DeficitPhaseService : IDeficitPhaseService
     {
         var phase = await _db.DeficitPhases
             .FirstOrDefaultAsync(d => d.UserId == userId && d.Status == DeficitPhaseStatus.Paused, ct)
-            ?? throw new InvalidOperationException("No paused deficit phase found.");
+            ?? throw new NotFoundException("DeficitPhase");
 
         phase.Status = DeficitPhaseStatus.Active;
         phase.UpdatedAt = DateTimeOffset.UtcNow;

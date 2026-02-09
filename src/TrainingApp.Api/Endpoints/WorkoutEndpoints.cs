@@ -272,10 +272,15 @@ public static class WorkoutEndpoints
 
         var evaluation = await autoregService.GetRecommendationsAsync(id, ct);
 
+        var exerciseIds = evaluation.Exercises.Select(e => e.ExerciseId).Distinct().ToList();
+        var exerciseNames = await db.Exercises.AsNoTracking()
+            .Where(ex => exerciseIds.Contains(ex.Id))
+            .ToDictionaryAsync(ex => ex.Id, ex => ex.Name, ct);
+
         var response = new WorkoutRecommendationsResponse(
             evaluation.Exercises.Select(e => new ExerciseRecommendationResponse(
                 e.ExerciseId,
-                db.Exercises.AsNoTracking().FirstOrDefault(ex => ex.Id == e.ExerciseId)?.Name ?? "Unknown",
+                exerciseNames.GetValueOrDefault(e.ExerciseId, "Unknown"),
                 e.Volume.ToString(),
                 e.NextSet is not null ? new NextSetResponse(e.NextSet.Weight, e.NextSet.Reps, e.NextSet.TargetRir) : null,
                 e.Reason)).ToList(),

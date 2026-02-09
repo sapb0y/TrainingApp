@@ -47,7 +47,7 @@ public class PartnerEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task AcceptInvite_SelfInvite_Returns500()
+    public async Task AcceptInvite_SelfInvite_Returns400()
     {
         var inviteResponse = await _client.PostAsync("/api/v1/partners/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CreateInviteResponse>();
@@ -56,7 +56,7 @@ public class PartnerEndpointsTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/api/v1/partners/accept",
             new AcceptInviteRequest(invite!.InviteCode));
 
-        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
