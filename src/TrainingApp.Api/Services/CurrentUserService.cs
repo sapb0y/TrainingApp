@@ -31,4 +31,7 @@ public class CurrentUserService : ICurrentUserService
 
     public bool IsCoach =>
         _httpContextAccessor.HttpContext?.User.IsInRole("Coach") ?? false;
+
+    public bool IsAdmin =>
+        _httpContextAccessor.HttpContext?.User.IsInRole("Admin") ?? false;
 }
