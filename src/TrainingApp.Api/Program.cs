@@ -50,6 +50,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapHealthChecks("/health");
+app.MapAuthEndpoints();
 app.MapExerciseEndpoints();
 app.MapWorkoutEndpoints();
 app.MapProgramEndpoints();
