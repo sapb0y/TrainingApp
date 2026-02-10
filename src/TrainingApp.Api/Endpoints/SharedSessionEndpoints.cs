@@ -11,7 +11,8 @@ public static class SharedSessionEndpoints
     {
         var group = app.MapGroup("/api/v1/shared-sessions")
             .WithTags("Shared Sessions")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapPost("/", CreateSession)
             .WithName("CreateSharedSession")

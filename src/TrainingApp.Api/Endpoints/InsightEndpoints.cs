@@ -1,4 +1,6 @@
 using TrainingApp.Api.Contracts;
+using TrainingApp.Api.Filters;
+using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 
 namespace TrainingApp.Api.Endpoints;
@@ -9,7 +11,8 @@ public static class InsightEndpoints
     {
         var group = app.MapGroup("/api/v1/insights")
             .WithTags("Insights")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapPost("/generate", GenerateInsights)
             .WithName("GenerateInsights")

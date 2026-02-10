@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Api.Contracts;
+using TrainingApp.Api.Filters;
+using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Core.Services;
 using TrainingApp.Infrastructure.Data;
@@ -12,7 +14,8 @@ public static class DashboardEndpoints
     {
         var group = app.MapGroup("/api/v1/dashboard")
             .WithTags("Dashboard")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapGet("/summary", GetDashboardSummary)
             .WithName("GetDashboardSummary")

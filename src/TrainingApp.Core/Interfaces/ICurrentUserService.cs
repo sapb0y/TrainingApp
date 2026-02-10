@@ -1,3 +1,5 @@
+using TrainingApp.Core.Entities;
+
 namespace TrainingApp.Core.Interfaces;
 
 public interface ICurrentUserService
@@ -6,4 +8,5 @@ public interface ICurrentUserService
     bool IsAuthenticated { get; }
     bool IsCoach { get; }
     bool IsAdmin { get; }
+    SubscriptionTier Tier { get; }
 }

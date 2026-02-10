@@ -11,7 +11,8 @@ public static class GoalEndpoints
     {
         var group = app.MapGroup("/api/v1/goals")
             .WithTags("Goals")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapPost("/", CreateGoal)
             .WithName("CreateGoal")

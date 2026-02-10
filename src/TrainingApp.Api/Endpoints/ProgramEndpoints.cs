@@ -20,7 +20,8 @@ public static class ProgramEndpoints
         group.MapPost("/generate", GenerateProgram)
             .WithName("GenerateProgram")
             .WithSummary("Generate a new periodized training program")
-            .WithValidation<GenerateProgramRequest>();
+            .WithValidation<GenerateProgramRequest>()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapGet("/", GetAll)
             .WithName("GetPrograms")

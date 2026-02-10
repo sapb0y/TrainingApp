@@ -63,6 +63,14 @@ public class ExceptionHandlingMiddleware
                 Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
                 Extensions = { ["code"] = fe.Code }
             },
+            TierRequiredException tre => new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Tier Required",
+                Detail = tre.Message,
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                Extensions = { ["code"] = tre.Code, ["requiredTier"] = tre.RequiredTier.ToString() }
+            },
             _ => CreateInternalError(exception)
         };
 

@@ -11,7 +11,8 @@ public static class PartnerEndpoints
     {
         var group = app.MapGroup("/api/v1/partners")
             .WithTags("Partners")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapPost("/invite", CreateInvite)
             .WithName("CreateInvite")
