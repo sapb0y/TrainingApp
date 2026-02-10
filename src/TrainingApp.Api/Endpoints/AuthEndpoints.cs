@@ -43,6 +43,7 @@ public static class AuthEndpoints
         RegisterRequest request,
         UserManager<User> userManager,
         IJwtTokenService jwtService,
+        ISubscriptionService subscriptionService,
         CancellationToken ct)
     {
         var user = new User
@@ -64,9 +65,11 @@ public static class AuthEndpoints
         }
 
         await userManager.AddToRoleAsync(user, "Athlete");
+        var subscription = await subscriptionService.CreateTrialAsync(user.Id, ct);
+        var tier = subscription.Tier.ToString();
 
         var (accessToken, refreshToken, expiresAt) = await jwtService.GenerateTokensAsync(user, ct);
-        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, "Athlete", "Competitor");
+        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, "Athlete", tier);
 
         return Results.Ok(new AuthResponse(accessToken, refreshToken, expiresAt, userInfo));
     }
@@ -75,6 +78,7 @@ public static class AuthEndpoints
         LoginRequest request,
         UserManager<User> userManager,
         IJwtTokenService jwtService,
+        ISubscriptionService subscriptionService,
         CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(request.Email);
@@ -83,9 +87,10 @@ public static class AuthEndpoints
 
         var roles = await userManager.GetRolesAsync(user);
         var role = roles.FirstOrDefault();
+        var effectiveTier = await subscriptionService.GetEffectiveTierAsync(user.Id, ct);
 
         var (accessToken, refreshToken, expiresAt) = await jwtService.GenerateTokensAsync(user, ct);
-        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, role, "Competitor");
+        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, role, effectiveTier.ToString());
 
         return Results.Ok(new AuthResponse(accessToken, refreshToken, expiresAt, userInfo));
     }
@@ -111,15 +116,17 @@ public static class AuthEndpoints
     private static async Task<IResult> Me(
         ICurrentUserService currentUser,
         UserManager<User> userManager,
+        ISubscriptionService subscriptionService,
         CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(currentUser.UserId.ToString())
             ?? throw new Core.Exceptions.NotFoundException("User", currentUser.UserId.ToString());
 
         var roles = await userManager.GetRolesAsync(user);
+        var effectiveTier = await subscriptionService.GetEffectiveTierAsync(user.Id, ct);
 
         return Results.Ok(new UserInfoResponse(
             user.Id, user.Email!, user.DisplayName,
-            roles.FirstOrDefault(), "Competitor"));
+            roles.FirstOrDefault(), effectiveTier.ToString()));
     }
 }

@@ -107,6 +107,9 @@ app.MapSharedSessionEndpoints();
 app.MapCoachEndpoints();
 app.MapCoachDashboardEndpoints();
 app.MapCoachActionEndpoints();
+app.MapSubscriptionEndpoints();
+app.MapCoachApplicationEndpoints();
+app.MapAdminEndpoints();
 
 app.Run();
 
