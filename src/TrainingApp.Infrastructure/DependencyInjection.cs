@@ -43,6 +43,10 @@ public static class DependencyInjection
 
         // JWT settings
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+
+        // Stripe + Email settings
+        services.Configure<StripeSettings>(configuration.GetSection("Stripe"));
+        services.Configure<EmailSettings>(configuration.GetSection("Email"));
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Memory cache

@@ -15,6 +15,8 @@ public class UserSubscription
     public bool CoachFreeForever { get; set; }
     public string? StripeCustomerId { get; set; }
     public string? StripeSubscriptionId { get; set; }
+    public DateTimeOffset? CancelledAt { get; set; }
+    public DateTimeOffset? PaymentFailedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
