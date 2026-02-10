@@ -55,3 +55,13 @@ public class ForbiddenException : DomainException
 
     public ForbiddenException(string message) : base(message) { }
 }
+
+public class TierRequiredException : DomainException
+{
+    public override string Code => "TIER_REQUIRED";
+    public Entities.SubscriptionTier RequiredTier { get; }
+
+    public TierRequiredException(Entities.SubscriptionTier required)
+        : base($"This feature requires {required} tier or higher.")
+    { RequiredTier = required; }
+}

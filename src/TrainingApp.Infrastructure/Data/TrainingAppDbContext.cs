@@ -33,6 +33,8 @@ public class TrainingAppDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<CoachAthlete> CoachAthletes => Set<CoachAthlete>();
     public DbSet<CoachNote> CoachNotes => Set<CoachNote>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
+    public DbSet<CoachApplication> CoachApplications => Set<CoachApplication>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

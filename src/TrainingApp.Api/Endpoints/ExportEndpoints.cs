@@ -1,3 +1,5 @@
+using TrainingApp.Api.Filters;
+using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 
 namespace TrainingApp.Api.Endpoints;
@@ -8,7 +10,8 @@ public static class ExportEndpoints
     {
         var group = app.MapGroup("/api/v1/export")
             .WithTags("Export")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Competitor);
 
         group.MapGet("/workouts", ExportWorkouts)
             .WithName("ExportWorkouts")

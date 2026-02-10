@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TrainingApp.Api.Contracts;
+using TrainingApp.Api.Filters;
 using TrainingApp.Core.Entities;
 using TrainingApp.Core.Exceptions;
 using TrainingApp.Core.Interfaces;
@@ -14,7 +15,8 @@ public static class CoachDashboardEndpoints
     {
         var group = app.MapGroup("/api/v1/coach")
             .WithTags("Coach Dashboard")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Coach);
 
         group.MapGet("/dashboard", GetDashboard)
             .WithName("GetCoachDashboard")

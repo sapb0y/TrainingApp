@@ -85,6 +85,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         return client;
     }
 
+    public HttpClient CreateAthleteClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-SubscriptionTier", "Athlete");
+        return client;
+    }
+
     private static void SeedTestUser(TrainingAppDbContext db)
     {
         if (!db.Users.Any(u => u.Id == TempUserId))

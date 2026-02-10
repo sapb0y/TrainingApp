@@ -37,12 +37,20 @@ public class JwtTokenService : IJwtTokenService
         var jti = Guid.NewGuid().ToString();
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_settings.AccessTokenExpiryMinutes);
 
+        // Resolve subscription tier
+        var subscription = await _db.UserSubscriptions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == user.Id, ct);
+
+        var effectiveTier = ResolveEffectiveTier(subscription);
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email!),
             new(JwtRegisteredClaimNames.Jti, jti),
-            new("display_name", user.DisplayName)
+            new("display_name", user.DisplayName),
+            new("subscription_tier", effectiveTier.ToString())
         };
 
         foreach (var role in roles)
@@ -148,5 +156,21 @@ public class JwtTokenService : IJwtTokenService
             child.RevokedAt = DateTimeOffset.UtcNow;
             await RevokeDescendantsAsync(child, ct);
         }
+    }
+
+    private static SubscriptionTier ResolveEffectiveTier(UserSubscription? subscription)
+    {
+        if (subscription is null)
+            return SubscriptionTier.Athlete;
+
+        if (subscription.Status == SubscriptionStatus.Trial
+            && subscription.TrialEndDate.HasValue
+            && subscription.TrialEndDate.Value < DateTimeOffset.UtcNow)
+            return SubscriptionTier.Athlete;
+
+        if (subscription.Status is SubscriptionStatus.Cancelled or SubscriptionStatus.Expired)
+            return SubscriptionTier.Athlete;
+
+        return subscription.Tier;
     }
 }

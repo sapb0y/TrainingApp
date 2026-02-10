@@ -15,7 +15,8 @@ public static class CoachActionEndpoints
     {
         var group = app.MapGroup("/api/v1/coach")
             .WithTags("Coach Actions")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireTier(SubscriptionTier.Coach);
 
         group.MapPost("/athletes/{id:guid}/programs/generate", GenerateAthleteProgram)
             .WithName("GenerateAthleteProgram")

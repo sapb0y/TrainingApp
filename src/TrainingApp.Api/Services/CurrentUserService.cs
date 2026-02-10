@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 
 namespace TrainingApp.Api.Services;
@@ -34,4 +35,18 @@ public class CurrentUserService : ICurrentUserService
 
     public bool IsAdmin =>
         _httpContextAccessor.HttpContext?.User.IsInRole("Admin") ?? false;
+
+    public SubscriptionTier Tier
+    {
+        get
+        {
+            var tierClaim = _httpContextAccessor.HttpContext?.User
+                .FindFirst("subscription_tier")?.Value;
+
+            if (Enum.TryParse<SubscriptionTier>(tierClaim, true, out var tier))
+                return tier;
+
+            return SubscriptionTier.Athlete;
+        }
+    }
 }
