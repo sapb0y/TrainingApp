@@ -24,6 +24,8 @@ public class User : IdentityUser<Guid>
     public ICollection<CoachAthlete> CoachRelationshipsAsCoach { get; set; } = [];
     public ICollection<CoachAthlete> CoachRelationshipsAsAthlete { get; set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
+    public UserSubscription? Subscription { get; set; }
+    public ICollection<CoachApplication> CoachApplications { get; set; } = [];
 }
 
 public class UserSettings

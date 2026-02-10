@@ -71,6 +71,8 @@ public static class DependencyInjection
         services.AddScoped<ISharedSessionService, SharedSessionService>();
         services.AddScoped<ICoachAthleteService, CoachAthleteService>();
         services.AddScoped<ICoachAlertAggregatorService, CoachAlertAggregatorService>();
+        services.AddScoped<ISubscriptionService, SubscriptionService>();
+        services.AddScoped<ICoachApplicationService, CoachApplicationService>();
 
         return services;
     }
