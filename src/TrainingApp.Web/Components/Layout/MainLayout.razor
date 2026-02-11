@@ -1,34 +1,56 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider Theme="AppTheme.Default" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<nav class="fs-nav">
+    <a href="/" class="fs-nav-brand">FitSpiralS</a>
 
-<MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary">
-        <MudText Typo="Typo.h6" Class="ml-3" Style="cursor:pointer">
-            <a href="/" style="color:white;text-decoration:none">FitSpiralS</a>
-        </MudText>
-        <MudSpacer />
-        <MudButton Href="/pricing" Color="Color.Inherit">Pricing</MudButton>
+    <input type="checkbox" id="fs-menu-toggle" class="fs-hamburger-toggle" />
+    <label for="fs-menu-toggle" class="fs-hamburger" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+    </label>
+
+    <label for="fs-menu-toggle" class="fs-nav-overlay"></label>
+
+    <div class="fs-nav-links">
+        <a href="/pricing">Pricing</a>
         <AuthorizeView>
             <Authorized>
-                <MudButton Href="/admin" Color="Color.Inherit">Dashboard</MudButton>
-                <MudButton Href="/logout" Color="Color.Inherit">Logout</MudButton>
+                <a href="/admin">Dashboard</a>
+                <a href="/logout">Logout</a>
             </Authorized>
             <NotAuthorized>
-                <MudButton Href="/login" Color="Color.Inherit">Login</MudButton>
-                <MudButton Href="/register" Variant="Variant.Outlined" Color="Color.Inherit">Register</MudButton>
+                <a href="/login">Login</a>
+                <a href="/register" class="fs-btn-nav">Start Free</a>
             </NotAuthorized>
         </AuthorizeView>
-    </MudAppBar>
+    </div>
+</nav>
 
-    <MudMainContent>
-        @Body
-    </MudMainContent>
+@Body
 
-    <footer class="footer">
-        <p>&copy; @DateTime.UtcNow.Year FitSpiralS. All rights reserved.</p>
-    </footer>
-</MudLayout>
+<footer class="fs-footer">
+    <div class="fs-footer-inner">
+        <div>
+            <p class="fs-footer-brand">FitSpiralS</p>
+            <p class="fs-footer-desc">Periodized programming that adapts to you. Built on science, not hype.</p>
+        </div>
+        <div>
+            <h4>Product</h4>
+            <ul class="fs-footer-links">
+                <li><a href="/pricing">Pricing</a></li>
+                <li><a href="/register">Free Trial</a></li>
+                <li><a href="/login">Sign In</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4>Legal</h4>
+            <ul class="fs-footer-links">
+                <li><a href="mailto:support@fitspirals.com">Contact</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="fs-footer-bottom">
+        &copy; @DateTime.UtcNow.Year FitSpiralS. All rights reserved.
+    </div>
+</footer>

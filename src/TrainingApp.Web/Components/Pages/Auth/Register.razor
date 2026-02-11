@@ -5,47 +5,54 @@
 @inject SignInManager<User> SignInManager
 @inject NavigationManager Navigation
 
-<PageTitle>Register - FitSpiralS</PageTitle>
+<PageTitle>Register — FitSpiralS</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="py-12">
-    <MudCard Elevation="2">
-        <MudCardContent Class="pa-8">
-            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-6">Create Account</MudText>
+<div class="fs-auth-page">
+    <div class="fs-auth-card">
+        <h1>Join the spiral.</h1>
+        <p class="fs-auth-subtitle">14 days free. No credit card.</p>
 
-            @if (_errors.Count > 0)
-            {
-                <MudAlert Severity="Severity.Error" Class="mb-4">
-                    @foreach (var err in _errors)
-                    {
-                        <div>@err</div>
-                    }
-                </MudAlert>
-            }
+        @if (_errors.Count > 0)
+        {
+            <div class="fs-alert-error">
+                @foreach (var err in _errors)
+                {
+                    <div>@err</div>
+                }
+            </div>
+        }
 
-            <EditForm Model="Input" FormName="register" OnValidSubmit="RegisterAsync" method="post">
-                <DataAnnotationsValidator />
+        <EditForm Model="Input" FormName="register" OnValidSubmit="RegisterAsync" method="post">
+            <DataAnnotationsValidator />
 
-                <MudTextField @bind-Value="Input!.DisplayName" Label="Display Name"
-                              Required="true" Class="mb-4" />
-                <MudTextField @bind-Value="Input!.Email" Label="Email" InputType="InputType.Email"
-                              Required="true" Class="mb-4" />
-                <MudTextField @bind-Value="Input!.Password" Label="Password" InputType="InputType.Password"
-                              Required="true" Class="mb-4" />
-                <MudTextField @bind-Value="Input!.ConfirmPassword" Label="Confirm Password"
-                              InputType="InputType.Password" Required="true" Class="mb-4" />
+            <div class="fs-form-group">
+                <label for="displayname">Display Name</label>
+                <InputText id="displayname" @bind-Value="Input!.DisplayName" placeholder="Your name" />
+            </div>
 
-                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled"
-                           Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="mb-4">
-                    Create Account
-                </MudButton>
-            </EditForm>
+            <div class="fs-form-group">
+                <label for="email">Email</label>
+                <InputText id="email" @bind-Value="Input!.Email" type="email" placeholder="you@example.com" />
+            </div>
 
-            <MudText Typo="Typo.body2" Align="Align.Center">
-                Already have an account? <MudLink Href="/login">Sign in</MudLink>
-            </MudText>
-        </MudCardContent>
-    </MudCard>
-</MudContainer>
+            <div class="fs-form-group">
+                <label for="password">Password</label>
+                <InputText id="password" @bind-Value="Input!.Password" type="password" placeholder="••••••••" />
+            </div>
+
+            <div class="fs-form-group">
+                <label for="confirm">Confirm Password</label>
+                <InputText id="confirm" @bind-Value="Input!.ConfirmPassword" type="password" placeholder="••••••••" />
+            </div>
+
+            <button type="submit" class="fs-btn-submit">Create Account</button>
+        </EditForm>
+
+        <p class="fs-auth-footer">
+            Already have an account? <a href="/login">Sign in</a>
+        </p>
+    </div>
+</div>
 
 @code {
     [SupplyParameterFromForm]

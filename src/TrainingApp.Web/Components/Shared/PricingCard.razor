@@ -1,43 +1,24 @@
-@* SSR-safe pricing card *@
-
-<MudCard Elevation="@(Highlighted ? 4 : 1)" Class="@CardClass" Style="@CardStyle">
+<div class="fs-pricing-card @(Highlighted ? "highlighted" : "") fs-animate fs-delay-@Delay">
     @if (Highlighted)
     {
-        <MudChip T="string" Color="Color.Primary" Size="Size.Small"
-                 Style="position:absolute;top:-12px;left:50%;transform:translateX(-50%)">
-            Most Popular
-        </MudChip>
+        <div class="fs-pricing-badge">Most Popular</div>
     }
-    <MudCardContent Class="text-center pa-6">
-        <MudText Typo="Typo.h5" Color="Color.Primary">@TierName</MudText>
-        <MudText Typo="Typo.h3" Class="mt-2 mb-1" Style="font-weight:700">
-            $@Price<span style="font-size:1rem;font-weight:400">/mo</span>
-        </MudText>
-        <MudDivider Class="my-4" />
+    <p class="fs-pricing-tier">@TierName</p>
+    <p class="fs-pricing-price">$@Price<span>/mo</span></p>
+    <div class="fs-pricing-divider"></div>
+    <ul class="fs-pricing-features">
         @foreach (var feature in Features)
         {
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;justify-content:flex-start">
-                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.body2">@feature</MudText>
-            </div>
+            <li><span class="fs-pricing-check">✓</span> @feature</li>
         }
-    </MudCardContent>
-    <MudCardActions Class="justify-center pb-6">
-        <MudButton Variant="@(Highlighted ? Variant.Filled : Variant.Outlined)"
-                   Color="Color.Primary" Href="/register" Size="Size.Large">
-            Get Started
-        </MudButton>
-    </MudCardActions>
-</MudCard>
+    </ul>
+    <a href="/register" class="@(Highlighted ? "fs-btn-primary" : "fs-btn-secondary")">Get Started</a>
+</div>
 
 @code {
     [Parameter] public string TierName { get; set; } = "";
     [Parameter] public int Price { get; set; }
     [Parameter] public List<string> Features { get; set; } = [];
     [Parameter] public bool Highlighted { get; set; }
-
-    private string CardClass => Highlighted ? "position-relative" : "";
-    private string CardStyle => Highlighted
-        ? "border: 2px solid #1565C0; min-width: 300px; max-width: 360px; flex: 1;"
-        : "min-width: 300px; max-width: 360px; flex: 1;";
+    [Parameter] public int Delay { get; set; } = 1;
 }

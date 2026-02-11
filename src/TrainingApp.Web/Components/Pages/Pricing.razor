@@ -1,23 +1,70 @@
 @page "/pricing"
 
-<PageTitle>Pricing - FitSpiralS</PageTitle>
+<PageTitle>Pricing — FitSpiralS</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
-    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2">Choose Your Plan</MudText>
-    <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
-        All plans include a 14-day free trial. No credit card required.
-    </MudText>
-
-    <div class="pricing-cards">
-        <PricingCard TierName="Athlete" Price="20"
-                     Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking", "Body composition"])" />
-        <PricingCard TierName="Competitor" Price="45" Highlighted="true"
-                     Features="@(["Everything in Athlete", "Advanced analytics & charts", "Training partners", "Shared sessions", "Goal tracking & insights", "CSV/JSON data export"])" />
-        <PricingCard TierName="Coach" Price="99"
-                     Features="@(["Everything in Competitor", "Up to 50 athletes", "Alert engine (6 types)", "Program generation for athletes", "Coach dashboard & notes", "Athlete progress overview"])" />
+<div class="fs-pricing-page">
+    @* ===== HERO ===== *@
+    <div class="fs-pricing-hero fs-animate">
+        <h1>Pick your plan. Start today.</h1>
+        <p>All plans include a 14-day free trial. No credit card required.</p>
     </div>
 
-    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-8">
-        Questions? Contact us at support@fitspirals.com
-    </MudText>
-</MudContainer>
+    @* ===== PRICING CARDS ===== *@
+    <div class="fs-pricing" style="padding-top:0;">
+        <div class="fs-pricing-grid">
+            <PricingCard TierName="Athlete" Price="20" Delay="1"
+                Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking", "Body composition"])" />
+            <PricingCard TierName="Competitor" Price="45" Highlighted="true" Delay="2"
+                Features="@(["Everything in Athlete", "Advanced analytics & charts", "Training partners", "Shared sessions", "Goal tracking & insights", "CSV/JSON data export"])" />
+            <PricingCard TierName="Coach" Price="99" Delay="3"
+                Features="@(["Everything in Competitor", "Up to 50 athletes", "Alert engine (6 types)", "Program generation for athletes", "Coach dashboard & notes", "Athlete progress overview"])" />
+        </div>
+    </div>
+
+    @* ===== FAQ ===== *@
+    <section class="fs-faq fs-animate">
+        <h2>Questions? Answers.</h2>
+
+        <details>
+            <summary>What happens after my 14-day trial?</summary>
+            <div class="fs-faq-answer">
+                You pick a plan and keep training. If you don't, your data stays safe — we don't delete anything. You just lose access to premium features until you subscribe.
+            </div>
+        </details>
+
+        <details>
+            <summary>Can I switch plans later?</summary>
+            <div class="fs-faq-answer">
+                Absolutely. Upgrade or downgrade anytime through the billing portal. Changes take effect at your next billing cycle.
+            </div>
+        </details>
+
+        <details>
+            <summary>What periodization models do you support?</summary>
+            <div class="fs-faq-answer">
+                Linear, undulating, and block periodization. Programs are auto-generated based on your goals, experience level, and available training days.
+            </div>
+        </details>
+
+        <details>
+            <summary>How does the coach platform work?</summary>
+            <div class="fs-faq-answer">
+                Coaches can invite athletes, monitor their training via dashboards, set up 6 types of automated alerts, generate programs, and add contextual notes — all remotely.
+            </div>
+        </details>
+
+        <details>
+            <summary>Do I need a credit card to start?</summary>
+            <div class="fs-faq-answer">
+                Nope. 14 days free, no card required. We'll remind you before the trial ends.
+            </div>
+        </details>
+    </section>
+
+    @* ===== FINAL CTA ===== *@
+    <section class="fs-cta">
+        <h2 class="fs-animate">Still not sure?</h2>
+        <p class="fs-animate fs-delay-1">Start free. Cancel anytime. No hard feelings.</p>
+        <a href="/register" class="fs-btn-primary fs-animate fs-delay-2">Start Your Free Trial</a>
+    </section>
+</div>
