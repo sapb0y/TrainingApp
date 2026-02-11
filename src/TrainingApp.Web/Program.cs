@@ -9,6 +9,12 @@ using TrainingApp.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Static web assets manifest (needed for non-Development environments with dotnet run)
+if (!builder.Environment.IsDevelopment())
+{
+    builder.WebHost.UseStaticWebAssets();
+}
+
 // Shared infrastructure: DB, cache, domain services
 builder.Services.AddInfrastructureData(builder.Configuration);
 
@@ -52,7 +58,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
