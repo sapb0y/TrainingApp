@@ -1,0 +1,64 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+
+.hero-section {
+    background: linear-gradient(135deg, #1565C0 0%, #00897B 100%);
+    color: white;
+    padding: 80px 0;
+    text-align: center;
+}
+
+.hero-section h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.hero-section p {
+    font-size: 1.25rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto 32px;
+}
+
+.features-grid {
+    padding: 64px 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.pricing-section {
+    padding: 64px 24px;
+    background: #F5F5F5;
+}
+
+.pricing-cards {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.footer {
+    background: #212121;
+    color: #9E9E9E;
+    padding: 32px 24px;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.admin-content {
+    padding: 24px;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
