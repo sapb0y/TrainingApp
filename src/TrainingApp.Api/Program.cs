@@ -108,6 +108,8 @@ app.MapCoachEndpoints();
 app.MapCoachDashboardEndpoints();
 app.MapCoachActionEndpoints();
 app.MapSubscriptionEndpoints();
+app.MapPaymentEndpoints();
+app.MapWebhookEndpoints();
 app.MapCoachApplicationEndpoints();
 app.MapAdminEndpoints();
 

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using TrainingApp.Core.Entities;
+using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
 
 namespace TrainingApp.Integration.Tests;
@@ -37,7 +38,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:Secret"] = "TestOnlySecret_ForIntegrationTests_MinLength32Chars!!"
+                ["Jwt:Secret"] = "TestOnlySecret_ForIntegrationTests_MinLength32Chars!!",
+                ["Stripe:SecretKey"] = "sk_test_fake",
+                ["Stripe:PublishableKey"] = "pk_test_fake",
+                ["Stripe:WebhookSecret"] = "whsec_test_fake",
+                ["Email:Enabled"] = "false"
             });
         });
 
@@ -58,6 +63,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                 options.UseNpgsql(dataSource)
                     .ConfigureWarnings(w => w.Ignore(
                         Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+
+            // Replace IPaymentService with a fake for integration tests
+            var paymentDescriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(IPaymentService));
+            if (paymentDescriptor != null)
+                services.Remove(paymentDescriptor);
+            services.AddScoped<IPaymentService, FakePaymentService>();
 
             // Ensure database is created and migrated
             var sp = services.BuildServiceProvider();
@@ -138,4 +150,19 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
         db.SaveChanges();
     }
+}
+
+public class FakePaymentService : IPaymentService
+{
+    public Task<string> CreateOrGetCustomerAsync(Guid userId, string email, string name, CancellationToken ct = default)
+        => Task.FromResult($"cus_fake_{userId:N}");
+
+    public Task<CheckoutResult> CreateCheckoutSessionAsync(Guid userId, string stripeCustomerId, SubscriptionTier tier, BillingInterval interval, string successUrl, string cancelUrl, CancellationToken ct = default)
+        => Task.FromResult(new CheckoutResult("cs_fake_session", "https://checkout.stripe.com/fake"));
+
+    public Task<string> CreatePortalSessionAsync(string stripeCustomerId, string returnUrl, CancellationToken ct = default)
+        => Task.FromResult("https://billing.stripe.com/fake-portal");
+
+    public Task CancelSubscriptionAsync(string stripeSubscriptionId, CancellationToken ct = default)
+        => Task.CompletedTask;
 }

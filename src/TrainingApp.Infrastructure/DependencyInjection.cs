@@ -10,6 +10,8 @@ using TrainingApp.Core.Configuration;
 using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
+using TrainingApp.Infrastructure.External.Email;
+using TrainingApp.Infrastructure.External.Stripe;
 using TrainingApp.Infrastructure.External.Wger;
 using TrainingApp.Infrastructure.Services;
 
@@ -43,6 +45,10 @@ public static class DependencyInjection
 
         // JWT settings
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+
+        // Stripe + Email settings
+        services.Configure<StripeSettings>(configuration.GetSection("Stripe"));
+        services.Configure<EmailSettings>(configuration.GetSection("Email"));
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Memory cache
@@ -73,6 +79,9 @@ public static class DependencyInjection
         services.AddScoped<ICoachAlertAggregatorService, CoachAlertAggregatorService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<ICoachApplicationService, CoachApplicationService>();
+        services.AddScoped<IPaymentService, StripePaymentService>();
+        services.AddScoped<IStripeWebhookHandler, StripeWebhookHandler>();
+        services.AddScoped<IEmailService, SendGridEmailService>();
 
         return services;
     }

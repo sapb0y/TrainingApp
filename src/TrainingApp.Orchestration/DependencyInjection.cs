@@ -10,6 +10,7 @@ public static class DependencyInjection
         services.AddHostedService<ExerciseSyncService>();
         services.AddHostedService<WorkoutReminderService>();
         services.AddHostedService<DailyMetricsJob>();
+        services.AddHostedService<TrialExpiryNotificationJob>();
 
         return services;
     }

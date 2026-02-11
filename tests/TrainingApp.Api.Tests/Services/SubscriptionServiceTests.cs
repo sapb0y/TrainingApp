@@ -61,6 +61,7 @@ public class SubscriptionServiceTests
     private static SubscriptionService CreateService()
     {
         // SubscriptionService needs DbContext for DB methods, but IsTrialExpired is pure logic
-        return new SubscriptionService(null!);
+        var stripeSettings = Microsoft.Extensions.Options.Options.Create(new TrainingApp.Core.Configuration.StripeSettings());
+        return new SubscriptionService(null!, stripeSettings);
     }
 }

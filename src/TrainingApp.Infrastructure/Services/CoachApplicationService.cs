@@ -12,15 +12,18 @@ public class CoachApplicationService : ICoachApplicationService
     private readonly TrainingAppDbContext _db;
     private readonly UserManager<User> _userManager;
     private readonly ISubscriptionService _subscriptionService;
+    private readonly IEmailService _emailService;
 
     public CoachApplicationService(
         TrainingAppDbContext db,
         UserManager<User> userManager,
-        ISubscriptionService subscriptionService)
+        ISubscriptionService subscriptionService,
+        IEmailService emailService)
     {
         _db = db;
         _userManager = userManager;
         _subscriptionService = subscriptionService;
+        _emailService = emailService;
     }
 
     public async Task<CoachApplication> SubmitApplicationAsync(
@@ -84,13 +87,18 @@ public class CoachApplicationService : ICoachApplicationService
         application.ReviewedAt = DateTimeOffset.UtcNow;
         application.ReviewNotes = notes;
 
+        var user = await _userManager.FindByIdAsync(application.UserId.ToString())
+            ?? throw new NotFoundException("User", application.UserId.ToString());
+
         if (approve)
         {
-            var user = await _userManager.FindByIdAsync(application.UserId.ToString())
-                ?? throw new NotFoundException("User", application.UserId.ToString());
-
             await _userManager.AddToRoleAsync(user, "Coach");
             await _subscriptionService.ChangeTierAsync(application.UserId, SubscriptionTier.Coach, ct);
+            _ = _emailService.SendCoachApprovedAsync(user.Email!, user.DisplayName, ct);
+        }
+        else
+        {
+            _ = _emailService.SendCoachRejectedAsync(user.Email!, user.DisplayName, notes, ct);
         }
 
         await _db.SaveChangesAsync(ct);
