@@ -1,0 +1,60 @@
+@page "/admin/users"
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.DTOs
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject IAdminService AdminService
+@inject NavigationManager Navigation
+
+<PageTitle>Users - Admin - FitSpiralS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Users</MudText>
+
+<MudTextField @bind-Value="_search" Label="Search by email or name"
+              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+              Immediate="true" DebounceInterval="400" OnDebounceIntervalElapsed="OnSearch"
+              Class="mb-4" />
+
+<MudDataGrid T="AdminUserSummary" ServerData="LoadServerData" @ref="_grid"
+             Hover="true" Dense="true" RowClick="OnRowClick" Style="cursor:pointer">
+    <Columns>
+        <PropertyColumn Property="x => x.Email" Title="Email" />
+        <PropertyColumn Property="x => x.DisplayName" Title="Name" />
+        <PropertyColumn Property="x => x.Role" Title="Role" />
+        <PropertyColumn Property="x => x.Tier" Title="Tier" />
+        <PropertyColumn Property="x => x.Status" Title="Status" />
+        <PropertyColumn Property="x => x.CreatedAt" Title="Joined" Format="yyyy-MM-dd" />
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="AdminUserSummary" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<AdminUserSummary>? _grid;
+    private string? _search;
+
+    private async Task<GridData<AdminUserSummary>> LoadServerData(GridState<AdminUserSummary> state)
+    {
+        var result = await AdminService.GetUsersAsync(
+            _search, null, null, null,
+            state.Page + 1, state.PageSize);
+
+        return new GridData<AdminUserSummary>
+        {
+            Items = result.Items,
+            TotalItems = result.TotalCount
+        };
+    }
+
+    private void OnSearch(string _)
+    {
+        _grid?.ReloadServerData();
+    }
+
+    private void OnRowClick(DataGridRowClickEventArgs<AdminUserSummary> args)
+    {
+        Navigation.NavigateTo($"/admin/users/{args.Item.Id}");
+    }
+}
