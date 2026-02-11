@@ -4,38 +4,39 @@
 @inject SignInManager<User> SignInManager
 @inject NavigationManager Navigation
 
-<PageTitle>Login - FitSpiralS</PageTitle>
+<PageTitle>Login — FitSpiralS</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="py-12">
-    <MudCard Elevation="2">
-        <MudCardContent Class="pa-8">
-            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-6">Sign In</MudText>
+<div class="fs-auth-page">
+    <div class="fs-auth-card">
+        <h1>Welcome back.</h1>
+        <p class="fs-auth-subtitle">Let's get to work.</p>
 
-            @if (!string.IsNullOrEmpty(_error))
-            {
-                <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
-            }
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="fs-alert-error">@_error</div>
+        }
 
-            <EditForm Model="Input" FormName="login" OnValidSubmit="LoginAsync" method="post">
-                <DataAnnotationsValidator />
+        <EditForm Model="Input" FormName="login" OnValidSubmit="LoginAsync" method="post">
+            <DataAnnotationsValidator />
 
-                <MudTextField @bind-Value="Input!.Email" Label="Email" InputType="InputType.Email"
-                              Required="true" Class="mb-4" />
-                <MudTextField @bind-Value="Input!.Password" Label="Password" InputType="InputType.Password"
-                              Required="true" Class="mb-4" />
+            <div class="fs-form-group">
+                <label for="email">Email</label>
+                <InputText id="email" @bind-Value="Input!.Email" type="email" placeholder="you@example.com" />
+            </div>
 
-                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled"
-                           Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="mb-4">
-                    Sign In
-                </MudButton>
-            </EditForm>
+            <div class="fs-form-group">
+                <label for="password">Password</label>
+                <InputText id="password" @bind-Value="Input!.Password" type="password" placeholder="••••••••" />
+            </div>
 
-            <MudText Typo="Typo.body2" Align="Align.Center">
-                Don't have an account? <MudLink Href="/register">Register</MudLink>
-            </MudText>
-        </MudCardContent>
-    </MudCard>
-</MudContainer>
+            <button type="submit" class="fs-btn-submit">Sign In</button>
+        </EditForm>
+
+        <p class="fs-auth-footer">
+            Don't have an account? <a href="/register">Register</a>
+        </p>
+    </div>
+</div>
 
 @code {
     [SupplyParameterFromForm]

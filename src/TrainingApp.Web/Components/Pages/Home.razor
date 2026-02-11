@@ -1,62 +1,104 @@
 @page "/"
 
-<PageTitle>FitSpiralS - Adaptive Training</PageTitle>
+<PageTitle>FitSpiralS — Adaptive Training</PageTitle>
 
-<div class="hero-section">
-    <MudContainer MaxWidth="MaxWidth.Medium">
-        <h1>Train Smarter, Not Harder</h1>
-        <p>Periodized programming with RPE autoregulation, fatigue modeling, and real-time analytics — all in one platform.</p>
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Large"
-                   Href="/register" Style="color:white">
-            Start Free Trial
-        </MudButton>
-    </MudContainer>
-</div>
-
-<div class="features-grid">
-    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-8">Everything You Need</MudText>
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="4">
-            <FeatureCard Icon="@Icons.Material.Filled.FitnessCenter"
-                         Title="Periodized Programming"
-                         Description="Auto-generated programs with linear, undulating, and block periodization." />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <FeatureCard Icon="@Icons.Material.Filled.Speed"
-                         Title="RPE Autoregulation"
-                         Description="Load adjustments based on your daily readiness using RPE and e1RM tracking." />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <FeatureCard Icon="@Icons.Material.Filled.Psychology"
-                         Title="Fatigue Modeling"
-                         Description="Track stimulus, fatigue, and recovery to optimize training volume." />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <FeatureCard Icon="@Icons.Material.Filled.Analytics"
-                         Title="Analytics Dashboard"
-                         Description="Charts for volume, intensity, e1RM trends, body composition, and more." />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <FeatureCard Icon="@Icons.Material.Filled.School"
-                         Title="Coach Platform"
-                         Description="Manage athletes, set alerts, modify programs, and track progress remotely." />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <FeatureCard Icon="@Icons.Material.Filled.Group"
-                         Title="Training Partners"
-                         Description="Share sessions, compare progress, and train together with partners." />
-        </MudItem>
-    </MudGrid>
-</div>
-
-<div class="pricing-section">
-    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-8">Simple Pricing</MudText>
-    <div class="pricing-cards">
-        <PricingCard TierName="Athlete" Price="20"
-                     Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking"])" />
-        <PricingCard TierName="Competitor" Price="45" Highlighted="true"
-                     Features="@(["Everything in Athlete", "Advanced analytics", "Training partners", "Goal tracking", "Insights engine", "Data export"])" />
-        <PricingCard TierName="Coach" Price="99"
-                     Features="@(["Everything in Competitor", "Manage up to 50 athletes", "Alert engine", "Program generation", "Coach dashboard"])" />
+@* ===== HERO ===== *@
+<section class="fs-hero">
+    <div class="fs-spiral-bg"></div>
+    <div class="fs-hero-content fs-animate">
+        <h1>Your spreadsheet called. It's tired.</h1>
+        <p class="fs-hero-tagline">Periodized programming that actually adapts to YOU — with RPE autoregulation, fatigue modeling, and real-time analytics.</p>
+        <div class="fs-hero-buttons">
+            <a href="/register" class="fs-btn-primary">Start Free Trial</a>
+            <a href="/pricing" class="fs-btn-secondary">See Pricing</a>
+        </div>
     </div>
-</div>
+</section>
+
+@* ===== ROAST BAR ===== *@
+<section class="fs-roast-bar fs-animate fs-delay-2">
+    <p>Other apps count reps. <span>We count progress.</span></p>
+</section>
+
+@* ===== FEATURES ===== *@
+<section class="fs-features">
+    <div class="fs-section-title fs-animate">
+        <h2>Stop Guessing. Start Growing.</h2>
+        <p>Everything you need to train with intent.</p>
+    </div>
+    <div class="fs-features-grid">
+        <FeatureCard Emoji="🌀" Title="Periodized Programs" Delay="1"
+            Description="Auto-generated programs with linear, undulating, and block periodization. Science, not vibes." />
+        <FeatureCard Emoji="🎯" Title="RPE Autoregulation" Delay="2"
+            Description="Load adjustments based on your daily readiness. Because yesterday's max isn't today's max." />
+        <FeatureCard Emoji="🧠" Title="Fatigue Modeling" Delay="3"
+            Description="Track stimulus, fatigue, and recovery. Optimize volume before burnout finds you." />
+        <FeatureCard Emoji="📊" Title="Analytics Dashboard" Delay="4"
+            Description="Charts for volume, intensity, e1RM trends, and body composition. Data you actually use." />
+        <FeatureCard Emoji="🎓" Title="Coach Platform" Delay="5"
+            Description="Manage athletes, set alerts, modify programs, and track progress remotely. Your gym, everywhere." />
+        <FeatureCard Emoji="🤝" Title="Training Partners" Delay="6"
+            Description="Share sessions, compare progress, and train together. Accountability, built in." />
+    </div>
+</section>
+
+@* ===== STATS BAR ===== *@
+<section class="fs-stats fs-animate">
+    <div class="fs-stats-inner">
+        <div class="fs-stat">
+            <span class="fs-stat-number">100+</span>
+            <span class="fs-stat-label">API Endpoints</span>
+        </div>
+        <div class="fs-stat">
+            <span class="fs-stat-number">3</span>
+            <span class="fs-stat-label">Periodization Models</span>
+        </div>
+        <div class="fs-stat">
+            <span class="fs-stat-number">6</span>
+            <span class="fs-stat-label">Coach Alert Types</span>
+        </div>
+        <div class="fs-stat">
+            <span class="fs-stat-number">14</span>
+            <span class="fs-stat-label">Day Free Trial</span>
+        </div>
+    </div>
+</section>
+
+@* ===== ANTI-PITCH ===== *@
+<section class="fs-anti-pitch fs-animate">
+    <div class="fs-anti-pitch-inner">
+        <h2>What we DON'T do</h2>
+        <ul class="fs-anti-list">
+            <li><span class="fs-anti-x">✗</span> Spam you with motivational notifications</li>
+            <li><span class="fs-anti-x">✗</span> Lock basics behind $99/month paywalls</li>
+            <li><span class="fs-anti-x">✗</span> Pretend one-size-fits-all works</li>
+            <li><span class="fs-anti-x">✗</span> Ignore periodization science</li>
+        </ul>
+    </div>
+</section>
+
+@* ===== PRICING PREVIEW ===== *@
+<section class="fs-pricing">
+    <div class="fs-section-title fs-animate">
+        <h2>Simple Pricing</h2>
+        <p>14-day free trial. No credit card required.</p>
+    </div>
+    <div class="fs-pricing-grid">
+        <PricingCard TierName="Athlete" Price="20" Delay="1"
+            Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking"])" />
+        <PricingCard TierName="Competitor" Price="45" Highlighted="true" Delay="2"
+            Features="@(["Everything in Athlete", "Advanced analytics", "Training partners", "Goal tracking", "Insights engine", "Data export"])" />
+        <PricingCard TierName="Coach" Price="99" Delay="3"
+            Features="@(["Everything in Competitor", "Up to 50 athletes", "Alert engine", "Program generation", "Coach dashboard"])" />
+    </div>
+</section>
+
+@* ===== FINAL CTA ===== *@
+<section class="fs-cta">
+    <div class="fs-spiral-bg" style="opacity: 0.03;"></div>
+    <div style="position:relative;z-index:2;">
+        <h2 class="fs-animate">Ready to train like you mean it?</h2>
+        <p class="fs-animate fs-delay-1">Stop guessing. Start progressing. 14 days free.</p>
+        <a href="/register" class="fs-btn-primary fs-animate fs-delay-2">Get Started Free</a>
+    </div>
+</section>

@@ -1,15 +1,12 @@
-@* SSR-safe feature card *@
-
-<MudCard Elevation="0" Style="border: 1px solid #E0E0E0;">
-    <MudCardContent Class="text-center pa-6">
-        <MudIcon Icon="@Icon" Color="Color.Primary" Style="font-size: 2.5rem;" />
-        <MudText Typo="Typo.h6" Class="mt-3">@Title</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">@Description</MudText>
-    </MudCardContent>
-</MudCard>
+<div class="fs-feature-card fs-animate fs-delay-@Delay">
+    <span class="fs-card-emoji">@Emoji</span>
+    <h3>@Title</h3>
+    <p>@Description</p>
+</div>
 
 @code {
-    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Star;
+    [Parameter] public string Emoji { get; set; } = "";
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string Description { get; set; } = "";
+    [Parameter] public int Delay { get; set; } = 1;
 }
