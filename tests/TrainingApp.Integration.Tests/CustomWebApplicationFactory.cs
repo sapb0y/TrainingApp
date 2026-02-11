@@ -104,6 +104,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         return client;
     }
 
+    public HttpClient CreateAdminClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-UserRole", "Admin");
+        return client;
+    }
+
     private static void SeedTestUser(TrainingAppDbContext db)
     {
         if (!db.Users.Any(u => u.Id == TempUserId))

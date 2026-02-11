@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, StripePaymentService>();
         services.AddScoped<IStripeWebhookHandler, StripeWebhookHandler>();
         services.AddScoped<IEmailService, SendGridEmailService>();
+        services.AddScoped<IAdminService, AdminService>();
 
         return services;
     }
