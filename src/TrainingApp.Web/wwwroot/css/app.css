@@ -67,6 +67,38 @@ a:hover { text-decoration: underline; }
     50%      { transform: translateY(-10px); }
 }
 
+@keyframes introFadeOut {
+    0%   { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { opacity: 0; pointer-events: none; }
+}
+
+@keyframes blurText {
+    0%   { filter: blur(4px); opacity: 0; }
+    40%  { filter: blur(0); opacity: 1; }
+    100% { filter: blur(0); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(0, 230, 118, 0.2); }
+    50%      { box-shadow: 0 0 24px rgba(0, 230, 118, 0.5); }
+}
+
+@keyframes textGlow {
+    0%, 100% { text-shadow: 0 0 10px rgba(124, 58, 237, 0.2); }
+    50%      { text-shadow: 0 0 30px rgba(124, 58, 237, 0.5), 0 0 60px rgba(236, 72, 153, 0.2); }
+}
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-40px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(40px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
 /* --- Animation Utilities --- */
 .fs-animate {
     opacity: 0;
@@ -944,6 +976,244 @@ a:hover { text-decoration: underline; }
     color: var(--fs-muted);
     font-size: 0.95rem;
     line-height: 1.7;
+}
+
+/* ============================================
+   INTRO OVERLAY
+   ============================================ */
+.fs-intro-toggle { display: none; }
+
+.fs-intro-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--fs-black);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    animation: introFadeOut 0.8s ease 5.5s forwards;
+}
+
+.fs-intro-text {
+    font-size: clamp(1.8rem, 5vw, 3.5rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--fs-white), var(--fs-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 16px;
+}
+
+.fs-intro-text .blur-word {
+    display: inline-block;
+    animation: blurText 1.2s ease forwards;
+    opacity: 0;
+}
+
+.fs-intro-subtext {
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
+    color: var(--fs-muted);
+    margin: 0 0 40px;
+    opacity: 0;
+    animation: blurText 1.2s ease 1.5s forwards;
+}
+
+.fs-intro-skip {
+    color: var(--fs-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 10px 24px;
+    border: 1px solid var(--fs-border);
+    border-radius: 50px;
+    transition: color 0.2s, border-color 0.2s;
+    opacity: 0;
+    animation: fadeInUp 0.5s ease 2s forwards;
+}
+
+.fs-intro-skip:hover {
+    color: var(--fs-white);
+    border-color: var(--fs-purple);
+}
+
+.fs-intro-toggle:checked ~ .fs-intro-overlay {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+}
+
+/* ============================================
+   THE PROBLEM
+   ============================================ */
+.fs-problem {
+    padding: 100px 24px;
+    max-width: var(--fs-max-w);
+    margin: 0 auto;
+}
+
+.fs-problem-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.fs-problem-card {
+    background: var(--fs-dark);
+    border: 1px solid var(--fs-border);
+    border-left: 3px solid var(--fs-pink);
+    border-radius: var(--fs-radius);
+    padding: 32px 24px;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.fs-problem-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.1);
+}
+
+.fs-problem-card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 10px;
+}
+
+.fs-problem-card p {
+    color: var(--fs-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .fs-problem-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================
+   HOW IT WORKS
+   ============================================ */
+.fs-how-it-works {
+    padding: 100px 24px;
+    background: var(--fs-dark);
+}
+
+.fs-steps {
+    max-width: 700px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.fs-step {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+.fs-step-number {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--fs-purple), var(--fs-pink));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 1.2rem;
+}
+
+.fs-step h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0 0 6px;
+}
+
+.fs-step p {
+    color: var(--fs-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ============================================
+   TRIBE
+   ============================================ */
+.fs-tribe {
+    padding: 100px 24px;
+    background: linear-gradient(135deg, #1a0a2e, var(--fs-dark));
+    text-align: center;
+}
+
+.fs-tribe-inner {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.fs-tribe h2 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 800;
+    margin: 0 0 24px;
+}
+
+.fs-tribe p {
+    color: var(--fs-muted);
+    font-size: 1.1rem;
+    line-height: 1.8;
+    margin: 0 0 40px;
+}
+
+/* ============================================
+   TRUST BAR
+   ============================================ */
+.fs-trust {
+    background: var(--fs-dark);
+    border-top: 1px solid var(--fs-border);
+    border-bottom: 1px solid var(--fs-border);
+    padding: 32px 24px;
+    text-align: center;
+}
+
+.fs-trust-items {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    flex-wrap: wrap;
+}
+
+.fs-trust-item {
+    font-size: 1rem;
+    color: var(--fs-muted);
+    font-weight: 500;
+}
+
+.fs-trust-item span {
+    color: var(--fs-green);
+    font-weight: 700;
+    margin-right: 8px;
+}
+
+/* ============================================
+   PULSE & TEXT GLOW
+   ============================================ */
+.fs-pulse-glow {
+    animation: pulseGlow 2.5s ease infinite;
+}
+
+.fs-text-glow {
+    animation: textGlow 3s ease infinite;
+}
+
+.fs-slide-left {
+    opacity: 0;
+    animation: slideInLeft 0.7s ease forwards;
+}
+
+.fs-slide-right {
+    opacity: 0;
+    animation: slideInRight 0.7s ease forwards;
 }
 
 /* ============================================

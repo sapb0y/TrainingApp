@@ -1,53 +1,124 @@
 @page "/"
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>FitSpiralS — Adaptive Training</PageTitle>
 
-@* ===== HERO ===== *@
+@* ===== 1. INTRO OVERLAY ===== *@
+@if (_showIntro)
+{
+    <input type="checkbox" id="fs-intro-skip" class="fs-intro-toggle" />
+    <div class="fs-intro-overlay">
+        <p class="fs-intro-text">
+            <span class="blur-word" style="animation-delay:0.2s">Start</span>
+            <span class="blur-word" style="animation-delay:0.4s">a</span>
+            <span class="blur-word" style="animation-delay:0.6s">new</span>
+            <span class="blur-word" style="animation-delay:0.8s">chapter</span>
+            <span class="blur-word" style="animation-delay:1.0s">in</span>
+            <span class="blur-word" style="animation-delay:1.2s">your</span>
+            <span class="blur-word" style="animation-delay:1.4s">fitness.</span>
+        </p>
+        <p class="fs-intro-subtext">Your body adapts. Your program should too.</p>
+        <label for="fs-intro-skip" class="fs-intro-skip">Skip intro &rsaquo;</label>
+    </div>
+}
+
+@* ===== 2. HERO ===== *@
 <section class="fs-hero">
     <div class="fs-spiral-bg"></div>
     <div class="fs-hero-content fs-animate">
-        <h1>Your spreadsheet called. It's tired.</h1>
-        <p class="fs-hero-tagline">Periodized programming that actually adapts to YOU — with RPE autoregulation, fatigue modeling, and real-time analytics.</p>
+        <h1 class="fs-text-glow">Your body adapts. Your program should too.</h1>
+        <p class="fs-hero-tagline">Periodized programming with RPE autoregulation and fatigue modeling. Built for lifters who refuse to plateau.</p>
         <div class="fs-hero-buttons">
-            <a href="/register" class="fs-btn-primary">Start Free Trial</a>
-            <a href="/pricing" class="fs-btn-secondary">See Pricing</a>
+            <a href="/register" class="fs-btn-primary fs-pulse-glow">30 Days Free — No Card Required</a>
+            <a href="#how-it-works" class="fs-btn-secondary">See How It Works</a>
         </div>
     </div>
 </section>
 
-@* ===== ROAST BAR ===== *@
+@* ===== 3. ROAST BAR ===== *@
 <section class="fs-roast-bar fs-animate fs-delay-2">
-    <p>Other apps count reps. <span>We count progress.</span></p>
+    <p>Most apps track what you did. <span>We shape what you'll do next.</span></p>
 </section>
 
-@* ===== FEATURES ===== *@
+@* ===== 4. THE PROBLEM ===== *@
+<section class="fs-problem">
+    <div class="fs-section-title fs-animate">
+        <h2>The training app problem</h2>
+    </div>
+    <div class="fs-problem-grid">
+        <div class="fs-problem-card fs-animate fs-delay-1">
+            <h3>Cookie-cutter programs</h3>
+            <p>Everyone gets the same 12-week plan. Your body isn't generic — your program shouldn't be either.</p>
+        </div>
+        <div class="fs-problem-card fs-animate fs-delay-2">
+            <h3>Zero autoregulation</h3>
+            <p>Bad sleep, work stress, missed meals — none of it matters to your app. It tells you to hit the same numbers regardless.</p>
+        </div>
+        <div class="fs-problem-card fs-animate fs-delay-3">
+            <h3>No periodization</h3>
+            <p>Without planned intensity cycling, you either plateau or burn out. Most apps don't even know what a deload is.</p>
+        </div>
+    </div>
+</section>
+
+@* ===== 5. FEATURES ===== *@
 <section class="fs-features">
     <div class="fs-section-title fs-animate">
-        <h2>Stop Guessing. Start Growing.</h2>
+        <h2>Built for mastery.</h2>
         <p>Everything you need to train with intent.</p>
     </div>
     <div class="fs-features-grid">
         <FeatureCard Emoji="🌀" Title="Periodized Programs" Delay="1"
-            Description="Auto-generated programs with linear, undulating, and block periodization. Science, not vibes." />
+            Description="Auto-generated mesocycles with linear, undulating, and block periodization. Your program evolves as you do." />
         <FeatureCard Emoji="🎯" Title="RPE Autoregulation" Delay="2"
-            Description="Load adjustments based on your daily readiness. Because yesterday's max isn't today's max." />
+            Description="Load adjusts to your daily readiness. Train harder when you're fresh, pull back when you're not." />
         <FeatureCard Emoji="🧠" Title="Fatigue Modeling" Delay="3"
-            Description="Track stimulus, fatigue, and recovery. Optimize volume before burnout finds you." />
+            Description="Track stimulus, fatigue, and recovery in real time. Know when to push and when to deload." />
         <FeatureCard Emoji="📊" Title="Analytics Dashboard" Delay="4"
-            Description="Charts for volume, intensity, e1RM trends, and body composition. Data you actually use." />
+            Description="Volume, intensity, e1RM trends, and body composition — data that drives decisions, not vanity." />
         <FeatureCard Emoji="🎓" Title="Coach Platform" Delay="5"
-            Description="Manage athletes, set alerts, modify programs, and track progress remotely. Your gym, everywhere." />
+            Description="Manage athletes remotely with alerts, program generation, and contextual notes. Your gym, everywhere." />
         <FeatureCard Emoji="🤝" Title="Training Partners" Delay="6"
-            Description="Share sessions, compare progress, and train together. Accountability, built in." />
+            Description="Share sessions, compare progress, and hold each other accountable. Strength in numbers." />
     </div>
 </section>
 
-@* ===== STATS BAR ===== *@
+@* ===== 6. HOW IT WORKS ===== *@
+<section class="fs-how-it-works" id="how-it-works">
+    <div class="fs-section-title fs-animate">
+        <h2>Start training with intent in 3 minutes</h2>
+    </div>
+    <div class="fs-steps">
+        <div class="fs-step fs-slide-left fs-delay-1">
+            <div class="fs-step-number">1</div>
+            <div>
+                <h3>Sign up free</h3>
+                <p>30 days, full access. No credit card. No commitment. Just you and the barbell.</p>
+            </div>
+        </div>
+        <div class="fs-step fs-slide-right fs-delay-2">
+            <div class="fs-step-number">2</div>
+            <div>
+                <h3>Set your goals</h3>
+                <p>Tell us your experience level, training days, and objectives. We build your periodized program.</p>
+            </div>
+        </div>
+        <div class="fs-step fs-slide-left fs-delay-3">
+            <div class="fs-step-number">3</div>
+            <div>
+                <h3>Train and adapt</h3>
+                <p>Log RPE, track fatigue, and watch your program evolve with you. No more guessing.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+@* ===== 7. STATS BAR ===== *@
 <section class="fs-stats fs-animate">
     <div class="fs-stats-inner">
         <div class="fs-stat">
-            <span class="fs-stat-number">100+</span>
-            <span class="fs-stat-label">API Endpoints</span>
+            <span class="fs-stat-number">850+</span>
+            <span class="fs-stat-label">Exercises</span>
         </div>
         <div class="fs-stat">
             <span class="fs-stat-number">3</span>
@@ -58,30 +129,45 @@
             <span class="fs-stat-label">Coach Alert Types</span>
         </div>
         <div class="fs-stat">
-            <span class="fs-stat-number">14</span>
-            <span class="fs-stat-label">Day Free Trial</span>
+            <span class="fs-stat-number">30</span>
+            <span class="fs-stat-label">Days Free</span>
         </div>
     </div>
 </section>
 
-@* ===== ANTI-PITCH ===== *@
+@* ===== 8. ANTI-PITCH ===== *@
 <section class="fs-anti-pitch fs-animate">
     <div class="fs-anti-pitch-inner">
-        <h2>What we DON'T do</h2>
+        <h2>What we refuse to do</h2>
         <ul class="fs-anti-list">
             <li><span class="fs-anti-x">✗</span> Spam you with motivational notifications</li>
             <li><span class="fs-anti-x">✗</span> Lock basics behind $99/month paywalls</li>
             <li><span class="fs-anti-x">✗</span> Pretend one-size-fits-all works</li>
             <li><span class="fs-anti-x">✗</span> Ignore periodization science</li>
+            <li><span class="fs-anti-x">✗</span> Sell your training data</li>
+            <li><span class="fs-anti-x">✗</span> Lock you into annual contracts</li>
         </ul>
     </div>
 </section>
 
-@* ===== PRICING PREVIEW ===== *@
+@* ===== 9. TRIBE ===== *@
+<section class="fs-tribe">
+    <div class="fs-tribe-inner fs-animate">
+        <h2>Built for lifters who care about the science</h2>
+        <p>
+            Not influencer workouts. Not AI-generated nonsense. Periodization, autoregulation,
+            and fatigue management — the tools that serious lifters and coaches have used for
+            decades, finally in software that respects the craft.
+        </p>
+        <a href="/register" class="fs-btn-primary fs-pulse-glow">Join the spiral</a>
+    </div>
+</section>
+
+@* ===== 10. PRICING PREVIEW ===== *@
 <section class="fs-pricing">
     <div class="fs-section-title fs-animate">
-        <h2>Simple Pricing</h2>
-        <p>14-day free trial. No credit card required.</p>
+        <h2>Honest pricing</h2>
+        <p>30 days free. No credit card. No gotcha.</p>
     </div>
     <div class="fs-pricing-grid">
         <PricingCard TierName="Athlete" Price="20" Delay="1"
@@ -93,12 +179,42 @@
     </div>
 </section>
 
-@* ===== FINAL CTA ===== *@
+@* ===== 11. TRUST BAR ===== *@
+<section class="fs-trust fs-animate">
+    <div class="fs-trust-items">
+        <div class="fs-trust-item"><span>✓</span> Cancel anytime</div>
+        <div class="fs-trust-item"><span>✓</span> Data stays if you leave</div>
+        <div class="fs-trust-item"><span>✓</span> No annual lock-in</div>
+    </div>
+</section>
+
+@* ===== 12. FINAL CTA ===== *@
 <section class="fs-cta">
     <div class="fs-spiral-bg" style="opacity: 0.03;"></div>
     <div style="position:relative;z-index:2;">
-        <h2 class="fs-animate">Ready to train like you mean it?</h2>
-        <p class="fs-animate fs-delay-1">Stop guessing. Start progressing. 14 days free.</p>
-        <a href="/register" class="fs-btn-primary fs-animate fs-delay-2">Get Started Free</a>
+        <h2 class="fs-animate">Stop planning to train. Start training to progress.</h2>
+        <p class="fs-animate fs-delay-1">30 days free. We're so confident you'll stay, we don't even ask for a card.</p>
+        <a href="/register" class="fs-btn-primary fs-pulse-glow fs-animate fs-delay-2">Start Your Free 30 Days</a>
     </div>
 </section>
+
+@code {
+    private bool _showIntro;
+
+    protected override void OnInitialized()
+    {
+        var ctx = HttpContextAccessor.HttpContext;
+        if (ctx is null) return;
+
+        if (!ctx.Request.Cookies.ContainsKey("fs_intro_seen"))
+        {
+            _showIntro = true;
+            ctx.Response.Cookies.Append("fs_intro_seen", "1", new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddDays(30),
+                IsEssential = true,
+                SameSite = SameSiteMode.Lax
+            });
+        }
+    }
+}
