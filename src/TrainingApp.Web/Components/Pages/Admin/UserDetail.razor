@@ -1,0 +1,117 @@
+@page "/admin/users/{UserId:guid}"
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.DTOs
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject IAdminService AdminService
+@inject ICurrentUserService CurrentUser
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>User Detail - Admin - FitSpiralS</PageTitle>
+
+<MudButton Href="/admin/users" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Variant="Variant.Text" Class="mb-4">Back to Users</MudButton>
+
+@if (_user is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h5" Class="mb-4">@_user.DisplayName</MudText>
+                    <MudSimpleTable Dense="true">
+                        <tbody>
+                            <tr><td><strong>Email</strong></td><td>@_user.Email</td></tr>
+                            <tr><td><strong>Role</strong></td><td>@_user.Role</td></tr>
+                            <tr><td><strong>Joined</strong></td><td>@_user.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td></tr>
+                            <tr><td><strong>Workouts</strong></td><td>@_user.WorkoutCount</td></tr>
+                            <tr><td><strong>Last Workout</strong></td><td>@(_user.LastWorkoutDate?.ToString("yyyy-MM-dd") ?? "Never")</td></tr>
+                            <tr><td><strong>Coach Athletes</strong></td><td>@_user.CoachAthleteCount</td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-4">Subscription</MudText>
+                    <MudSimpleTable Dense="true">
+                        <tbody>
+                            <tr><td><strong>Tier</strong></td><td>@_user.Tier</td></tr>
+                            <tr><td><strong>Status</strong></td><td>@_user.SubscriptionStatus</td></tr>
+                            <tr><td><strong>Trial End</strong></td><td>@(_user.TrialEndDate?.ToString("yyyy-MM-dd") ?? "N/A")</td></tr>
+                            <tr><td><strong>Period End</strong></td><td>@(_user.CurrentPeriodEnd?.ToString("yyyy-MM-dd") ?? "N/A")</td></tr>
+                            <tr><td><strong>Stripe ID</strong></td><td>@(_user.StripeCustomerId ?? "N/A")</td></tr>
+                            <tr><td><strong>Cancelled</strong></td><td>@(_user.CancelledAt?.ToString("yyyy-MM-dd") ?? "No")</td></tr>
+                            <tr><td><strong>Payment Failed</strong></td><td>@(_user.PaymentFailedAt?.ToString("yyyy-MM-dd") ?? "No")</td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-4">Actions</MudText>
+                    <MudStack Row="true" Spacing="3">
+                        <MudSelect T="string" @bind-Value="_selectedRole" Label="Change Role"
+                                   Variant="Variant.Outlined" Style="max-width:200px">
+                            <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                            <MudSelectItem Value="@("Coach")">Coach</MudSelectItem>
+                            <MudSelectItem Value="@("Athlete")">Athlete</MudSelectItem>
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   OnClick="ChangeRoleAsync" Disabled="@(_selectedRole == _user.Role)">
+                            Update Role
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid UserId { get; set; }
+
+    private AdminUserDetail? _user;
+    private string? _selectedRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await AdminService.GetUserDetailAsync(UserId);
+        _selectedRole = _user?.Role;
+    }
+
+    private async Task ChangeRoleAsync()
+    {
+        if (_user is null || _selectedRole is null || _selectedRole == _user.Role)
+            return;
+
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Change role from {_user.Role} to {_selectedRole}?" },
+            { x => x.ButtonText, "Change" },
+            { x => x.ButtonColor, Color.Warning }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Role Change", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await AdminService.ChangeUserRoleAsync(CurrentUser.UserId, UserId, _selectedRole);
+            _user = await AdminService.GetUserDetailAsync(UserId);
+            Snackbar.Add($"Role changed to {_selectedRole}", Severity.Success);
+        }
+    }
+}

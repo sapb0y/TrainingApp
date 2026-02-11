@@ -1,0 +1,109 @@
+@page "/admin"
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.DTOs
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject IAdminService AdminService
+
+<PageTitle>Admin Dashboard - FitSpiralS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6">Dashboard</MudText>
+
+@if (_stats is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <div class="kpi-grid">
+        <MudCard Elevation="1">
+            <MudCardContent Class="text-center">
+                <MudText Typo="Typo.h3" Color="Color.Primary">@_stats.TotalUsers</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Total Users</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Elevation="1">
+            <MudCardContent Class="text-center">
+                <MudText Typo="Typo.h3" Color="Color.Primary">@_stats.ActiveSubscriptions</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Active Subscriptions</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Elevation="1">
+            <MudCardContent Class="text-center">
+                <MudText Typo="Typo.h3" Color="Color.Info">@_stats.TrialCount</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Trials</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Elevation="1">
+            <MudCardContent Class="text-center">
+                <MudText Typo="Typo.h3" Color="Color.Success">$@_stats.MrrEstimate.ToString("N0")</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">MRR Estimate</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Elevation="1">
+            <MudCardContent Class="text-center">
+                <MudText Typo="Typo.h3" Color="Color.Warning">@_stats.PastDueCount</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Past Due</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Elevation="1">
+            <MudCardContent Class="text-center">
+                <MudText Typo="Typo.h3" Color="Color.Tertiary">@_stats.RegistrationsLast30Days</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Registrations (30d)</MudText>
+            </MudCardContent>
+        </MudCard>
+    </div>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">Subscription Breakdown</MudText>
+                    <MudSimpleTable Dense="true">
+                        <thead>
+                            <tr><th>Status</th><th>Count</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Paid</td><td>@_stats.PaidCount</td></tr>
+                            <tr><td>Trial</td><td>@_stats.TrialCount</td></tr>
+                            <tr><td>Past Due</td><td>@_stats.PastDueCount</td></tr>
+                            <tr><td>Cancelled</td><td>@_stats.CancelledCount</td></tr>
+                            <tr><td>Coaches</td><td>@_stats.CoachCount</td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">Quick Links</MudText>
+                    <MudList T="string" Dense="true">
+                        <MudListItem Href="/admin/users" Icon="@Icons.Material.Filled.People">
+                            Manage Users
+                        </MudListItem>
+                        <MudListItem Href="/admin/subscriptions" Icon="@Icons.Material.Filled.CardMembership">
+                            Subscriptions
+                        </MudListItem>
+                        <MudListItem Href="/admin/payment-failures" Icon="@Icons.Material.Filled.Warning">
+                            Payment Failures
+                        </MudListItem>
+                        <MudListItem Href="/admin/coach-applications" Icon="@Icons.Material.Filled.School">
+                            Coach Applications
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private AdminStats? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await AdminService.GetSystemStatsAsync();
+    }
+}

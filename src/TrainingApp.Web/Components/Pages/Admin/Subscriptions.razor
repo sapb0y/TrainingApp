@@ -1,0 +1,141 @@
+@page "/admin/subscriptions"
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.DTOs
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject IAdminService AdminService
+@inject ICurrentUserService CurrentUser
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Subscriptions - Admin - FitSpiralS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Subscriptions</MudText>
+
+<MudStack Row="true" Spacing="3" Class="mb-4">
+    <MudSelect T="string" @bind-Value="_statusFilter" Label="Status" Variant="Variant.Outlined"
+               Clearable="true" Style="max-width:180px">
+        <MudSelectItem Value="@("Trial")">Trial</MudSelectItem>
+        <MudSelectItem Value="@("Active")">Active</MudSelectItem>
+        <MudSelectItem Value="@("PastDue")">Past Due</MudSelectItem>
+        <MudSelectItem Value="@("Cancelled")">Cancelled</MudSelectItem>
+    </MudSelect>
+    <MudSelect T="string" @bind-Value="_tierFilter" Label="Tier" Variant="Variant.Outlined"
+               Clearable="true" Style="max-width:180px">
+        <MudSelectItem Value="@("Athlete")">Athlete</MudSelectItem>
+        <MudSelectItem Value="@("Competitor")">Competitor</MudSelectItem>
+        <MudSelectItem Value="@("Coach")">Coach</MudSelectItem>
+    </MudSelect>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilters">Filter</MudButton>
+</MudStack>
+
+<MudDataGrid T="AdminSubscriptionSummary" ServerData="LoadServerData" @ref="_grid"
+             Hover="true" Dense="true">
+    <Columns>
+        <PropertyColumn Property="x => x.UserEmail" Title="Email" />
+        <PropertyColumn Property="x => x.UserName" Title="Name" />
+        <PropertyColumn Property="x => x.Tier" Title="Tier" />
+        <PropertyColumn Property="x => x.Status" Title="Status" />
+        <PropertyColumn Property="x => x.Interval" Title="Interval" />
+        <PropertyColumn Property="x => x.TrialEndDate" Title="Trial End" Format="yyyy-MM-dd" />
+        <PropertyColumn Property="x => x.CurrentPeriodEnd" Title="Period End" Format="yyyy-MM-dd" />
+        <TemplateColumn Title="Actions">
+            <CellTemplate>
+                <MudStack Row="true" Spacing="1">
+                    <MudTooltip Text="Override Tier">
+                        <MudIconButton Icon="@Icons.Material.Filled.Upgrade" Size="Size.Small"
+                                       OnClick="() => OverrideTierAsync(context.Item)" />
+                    </MudTooltip>
+                    <MudTooltip Text="Extend Trial">
+                        <MudIconButton Icon="@Icons.Material.Filled.Schedule" Size="Size.Small"
+                                       OnClick="() => ExtendTrialAsync(context.Item)" />
+                    </MudTooltip>
+                    <MudTooltip Text="Cancel">
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="() => CancelAsync(context.Item)" />
+                    </MudTooltip>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="AdminSubscriptionSummary" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<AdminSubscriptionSummary>? _grid;
+    private string? _statusFilter;
+    private string? _tierFilter;
+
+    private async Task<GridData<AdminSubscriptionSummary>> LoadServerData(GridState<AdminSubscriptionSummary> state)
+    {
+        var result = await AdminService.GetSubscriptionsAsync(
+            _statusFilter, _tierFilter, state.Page + 1, state.PageSize);
+
+        return new GridData<AdminSubscriptionSummary>
+        {
+            Items = result.Items,
+            TotalItems = result.TotalCount
+        };
+    }
+
+    private void ApplyFilters() => _grid?.ReloadServerData();
+
+    private async Task OverrideTierAsync(AdminSubscriptionSummary sub)
+    {
+        var tier = sub.Tier == "Coach" ? "Competitor" : "Coach";
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Override tier to {tier} for {sub.UserEmail}?" },
+            { x => x.ButtonText, "Override" },
+            { x => x.ButtonColor, Color.Warning }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Override Tier", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await AdminService.OverrideTierAsync(CurrentUser.UserId, sub.Id, tier, "Admin override");
+            await _grid!.ReloadServerData();
+            Snackbar.Add("Tier overridden", Severity.Success);
+        }
+    }
+
+    private async Task ExtendTrialAsync(AdminSubscriptionSummary sub)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Extend trial by 14 days for {sub.UserEmail}?" },
+            { x => x.ButtonText, "Extend" },
+            { x => x.ButtonColor, Color.Info }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Extend Trial", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await AdminService.ExtendTrialAsync(CurrentUser.UserId, sub.Id, 14);
+            await _grid!.ReloadServerData();
+            Snackbar.Add("Trial extended by 14 days", Severity.Success);
+        }
+    }
+
+    private async Task CancelAsync(AdminSubscriptionSummary sub)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Cancel subscription for {sub.UserEmail}? This cannot be undone." },
+            { x => x.ButtonText, "Cancel Subscription" },
+            { x => x.ButtonColor, Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Cancel Subscription", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await AdminService.AdminCancelSubscriptionAsync(CurrentUser.UserId, sub.Id, "Admin cancellation");
+            await _grid!.ReloadServerData();
+            Snackbar.Add("Subscription cancelled", Severity.Success);
+        }
+    }
+}

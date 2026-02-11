@@ -1,0 +1,80 @@
+@page "/admin/coach-applications"
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject ICoachApplicationService CoachAppService
+@inject ICurrentUserService CurrentUser
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Coach Applications - Admin - FitSpiralS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Coach Applications</MudText>
+
+@if (_applications is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_applications.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No pending applications.</MudAlert>
+}
+else
+{
+    <MudDataGrid T="CoachApplication" Items="_applications" Hover="true" Dense="true">
+        <Columns>
+            <PropertyColumn Property="x => x.User!.Email" Title="Email" />
+            <PropertyColumn Property="x => x.User!.DisplayName" Title="Name" />
+            <PropertyColumn Property="x => x.Credentials" Title="Credentials" />
+            <PropertyColumn Property="x => x.CurrentClientCount" Title="Clients" />
+            <PropertyColumn Property="x => x.BusinessGoal" Title="Goal" />
+            <PropertyColumn Property="x => x.CreatedAt" Title="Applied" Format="yyyy-MM-dd" />
+            <TemplateColumn Title="Actions">
+                <CellTemplate>
+                    <MudStack Row="true" Spacing="1">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success"
+                                   OnClick="() => ReviewAsync(context.Item, true)">
+                            Approve
+                        </MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                                   OnClick="() => ReviewAsync(context.Item, false)">
+                            Reject
+                        </MudButton>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@code {
+    private List<CoachApplication>? _applications;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _applications = await CoachAppService.GetPendingApplicationsAsync();
+    }
+
+    private async Task ReviewAsync(CoachApplication app, bool approve)
+    {
+        var action = approve ? "approve" : "reject";
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Are you sure you want to {action} this application from {app.User?.Email}?" },
+            { x => x.ButtonText, approve ? "Approve" : "Reject" },
+            { x => x.ButtonColor, approve ? Color.Success : Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>($"Confirm {action}", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await CoachAppService.ReviewApplicationAsync(app.Id, CurrentUser.UserId, approve, null);
+            _applications = await CoachAppService.GetPendingApplicationsAsync();
+            Snackbar.Add($"Application {action}d", approve ? Severity.Success : Severity.Warning);
+        }
+    }
+}

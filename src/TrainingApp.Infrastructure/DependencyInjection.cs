@@ -19,7 +19,11 @@ namespace TrainingApp.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    /// <summary>
+    /// Shared data layer: DB, cache, config, domain services. No auth config.
+    /// Used by both Api (+ JWT) and Web (+ cookie Identity).
+    /// </summary>
+    public static IServiceCollection AddInfrastructureData(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -31,25 +35,9 @@ public static class DependencyInjection
         services.AddDbContext<TrainingAppDbContext>(options =>
             options.UseNpgsql(dataSource));
 
-        services.AddIdentityCore<User>(options =>
-            {
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
-                options.Password.RequireNonAlphanumeric = false;
-                options.Password.RequiredLength = 8;
-                options.User.RequireUniqueEmail = true;
-            })
-            .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<TrainingAppDbContext>();
-
-        // JWT settings
-        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-
         // Stripe + Email settings
         services.Configure<StripeSettings>(configuration.GetSection("Stripe"));
         services.Configure<EmailSettings>(configuration.GetSection("Email"));
-        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Memory cache
         services.AddMemoryCache();
@@ -83,6 +71,32 @@ public static class DependencyInjection
         services.AddScoped<IStripeWebhookHandler, StripeWebhookHandler>();
         services.AddScoped<IEmailService, SendGridEmailService>();
         services.AddScoped<IAdminService, AdminService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Full API infrastructure: shared data + IdentityCore + JWT config.
+    /// </summary>
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddInfrastructureData(configuration);
+
+        services.AddIdentityCore<User>(options =>
+            {
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequiredLength = 8;
+                options.User.RequireUniqueEmail = true;
+            })
+            .AddRoles<IdentityRole<Guid>>()
+            .AddEntityFrameworkStores<TrainingAppDbContext>();
+
+        // JWT settings
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         return services;
     }

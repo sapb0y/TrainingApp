@@ -1,0 +1,64 @@
+@page "/admin/activity"
+@using TrainingApp.Core.DTOs
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject IAdminService AdminService
+
+<PageTitle>Activity - Admin - FitSpiralS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Recent Activity</MudText>
+
+@if (_activities is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_activities.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No recent activity.</MudAlert>
+}
+else
+{
+    <MudTimeline TimelinePosition="TimelinePosition.Start">
+        @foreach (var entry in _activities)
+        {
+            <MudTimelineItem Color="@GetColor(entry.Type)" Size="Size.Small"
+                             Icon="@GetIcon(entry.Type)">
+                <ItemContent>
+                    <MudText Typo="Typo.body1">@entry.Description</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @entry.Timestamp.ToString("yyyy-MM-dd HH:mm")
+                    </MudText>
+                </ItemContent>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+
+@code {
+    private List<ActivityEntry>? _activities;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _activities = await AdminService.GetRecentActivityAsync(50);
+    }
+
+    private static Color GetColor(ActivityType type) => type switch
+    {
+        ActivityType.Registration => Color.Success,
+        ActivityType.SubscriptionChange => Color.Info,
+        ActivityType.CoachApplication => Color.Warning,
+        ActivityType.AdminAction => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetIcon(ActivityType type) => type switch
+    {
+        ActivityType.Registration => Icons.Material.Filled.PersonAdd,
+        ActivityType.SubscriptionChange => Icons.Material.Filled.CardMembership,
+        ActivityType.CoachApplication => Icons.Material.Filled.School,
+        ActivityType.AdminAction => Icons.Material.Filled.AdminPanelSettings,
+        _ => Icons.Material.Filled.Info
+    };
+}

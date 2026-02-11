@@ -1,0 +1,48 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="AppTheme.Default" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit"
+                       Edge="Edge.Start" OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h6">
+            <a href="/" style="color:white;text-decoration:none">FitSpiralS</a>
+        </MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.body2" Color="Color.Inherit" Class="mr-3">Admin</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit" Href="/logout" />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always">
+        <MudNavMenu>
+            <MudNavLink Href="/admin" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="/admin/users"
+                        Icon="@Icons.Material.Filled.People">Users</MudNavLink>
+            <MudNavLink Href="/admin/subscriptions"
+                        Icon="@Icons.Material.Filled.CardMembership">Subscriptions</MudNavLink>
+            <MudNavLink Href="/admin/payment-failures"
+                        Icon="@Icons.Material.Filled.Warning">Payment Failures</MudNavLink>
+            <MudNavLink Href="/admin/activity"
+                        Icon="@Icons.Material.Filled.Timeline">Activity</MudNavLink>
+            <MudNavLink Href="/admin/coach-applications"
+                        Icon="@Icons.Material.Filled.School">Coach Applications</MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home">Back to Site</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent Class="admin-content">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+}
