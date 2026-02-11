@@ -1,0 +1,47 @@
+@page "/admin/payment-failures"
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.DTOs
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@layout TrainingApp.Web.Components.Layout.AdminLayout
+@inject IAdminService AdminService
+@inject NavigationManager Navigation
+
+<PageTitle>Payment Failures - Admin - FitSpiralS</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Payment Failures</MudText>
+
+<MudDataGrid T="PaymentFailureSummary" ServerData="LoadServerData"
+             Hover="true" Dense="true">
+    <Columns>
+        <PropertyColumn Property="x => x.Email" Title="Email" />
+        <PropertyColumn Property="x => x.Name" Title="Name" />
+        <PropertyColumn Property="x => x.Tier" Title="Tier" />
+        <PropertyColumn Property="x => x.PaymentFailedAt" Title="Failed At" Format="yyyy-MM-dd HH:mm" />
+        <PropertyColumn Property="x => x.StripeCustomerId" Title="Stripe Customer" />
+        <TemplateColumn Title="">
+            <CellTemplate>
+                <MudButton Size="Size.Small" Variant="Variant.Text"
+                           OnClick="@(() => Navigation.NavigateTo($"/admin/users/{context.Item.UserId}"))">
+                    View User
+                </MudButton>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="PaymentFailureSummary" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private async Task<GridData<PaymentFailureSummary>> LoadServerData(GridState<PaymentFailureSummary> state)
+    {
+        var result = await AdminService.GetPaymentFailuresAsync(state.Page + 1, state.PageSize);
+
+        return new GridData<PaymentFailureSummary>
+        {
+            Items = result.Items,
+            TotalItems = result.TotalCount
+        };
+    }
+}
