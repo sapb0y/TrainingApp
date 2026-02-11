@@ -10,6 +10,8 @@ using TrainingApp.Core.Configuration;
 using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure.Data;
+using TrainingApp.Infrastructure.External.Email;
+using TrainingApp.Infrastructure.External.Stripe;
 using TrainingApp.Infrastructure.External.Wger;
 using TrainingApp.Infrastructure.Services;
 
@@ -77,6 +79,9 @@ public static class DependencyInjection
         services.AddScoped<ICoachAlertAggregatorService, CoachAlertAggregatorService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<ICoachApplicationService, CoachApplicationService>();
+        services.AddScoped<IPaymentService, StripePaymentService>();
+        services.AddScoped<IStripeWebhookHandler, StripeWebhookHandler>();
+        services.AddScoped<IEmailService, SendGridEmailService>();
 
         return services;
     }
