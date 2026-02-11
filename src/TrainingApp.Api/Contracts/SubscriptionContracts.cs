@@ -10,6 +10,10 @@ public record SubscriptionResponse(
     DateTimeOffset? CurrentPeriodEnd,
     bool IsTrialExpired,
     DateTimeOffset? CoachFreeUntil,
-    bool CoachFreeForever);
+    bool CoachFreeForever,
+    int? TrialDaysRemaining,
+    bool HasStripeSubscription,
+    DateTimeOffset? CancelledAt,
+    DateTimeOffset? PaymentFailedAt);
 
 public record ChangeTierRequest(string Tier);

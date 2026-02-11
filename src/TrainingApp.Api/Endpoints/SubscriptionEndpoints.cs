@@ -31,17 +31,7 @@ public static class SubscriptionEndpoints
         if (subscription is null)
             return Results.Ok(new { tier = "Athlete", status = "None" });
 
-        return Results.Ok(new SubscriptionResponse(
-            subscription.Id,
-            subscription.Tier.ToString(),
-            subscription.Status.ToString(),
-            subscription.Interval.ToString(),
-            subscription.StartDate,
-            subscription.TrialEndDate,
-            subscription.CurrentPeriodEnd,
-            subscriptionService.IsTrialExpired(subscription),
-            subscription.CoachFreeUntil,
-            subscription.CoachFreeForever));
+        return Results.Ok(MapResponse(subscription, subscriptionService));
     }
 
     private static async Task<IResult> ChangeTier(
@@ -58,16 +48,22 @@ public static class SubscriptionEndpoints
 
         var subscription = await subscriptionService.ChangeTierAsync(currentUser.UserId, tier, ct);
 
-        return Results.Ok(new SubscriptionResponse(
-            subscription.Id,
-            subscription.Tier.ToString(),
-            subscription.Status.ToString(),
-            subscription.Interval.ToString(),
-            subscription.StartDate,
-            subscription.TrialEndDate,
-            subscription.CurrentPeriodEnd,
-            subscriptionService.IsTrialExpired(subscription),
-            subscription.CoachFreeUntil,
-            subscription.CoachFreeForever));
+        return Results.Ok(MapResponse(subscription, subscriptionService));
     }
+
+    private static SubscriptionResponse MapResponse(UserSubscription sub, ISubscriptionService svc) =>
+        new(sub.Id,
+            sub.Tier.ToString(),
+            sub.Status.ToString(),
+            sub.Interval.ToString(),
+            sub.StartDate,
+            sub.TrialEndDate,
+            sub.CurrentPeriodEnd,
+            svc.IsTrialExpired(sub),
+            sub.CoachFreeUntil,
+            sub.CoachFreeForever,
+            svc.GetTrialDaysRemaining(sub),
+            sub.StripeSubscriptionId is not null,
+            sub.CancelledAt,
+            sub.PaymentFailedAt);
 }

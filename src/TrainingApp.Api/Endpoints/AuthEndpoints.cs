@@ -44,6 +44,7 @@ public static class AuthEndpoints
         UserManager<User> userManager,
         IJwtTokenService jwtService,
         ISubscriptionService subscriptionService,
+        IEmailService emailService,
         CancellationToken ct)
     {
         var user = new User
@@ -67,9 +68,12 @@ public static class AuthEndpoints
         await userManager.AddToRoleAsync(user, "Athlete");
         var subscription = await subscriptionService.CreateTrialAsync(user.Id, ct);
         var tier = subscription.Tier.ToString();
+        var trialDays = subscriptionService.GetTrialDaysRemaining(subscription);
 
         var (accessToken, refreshToken, expiresAt) = await jwtService.GenerateTokensAsync(user, ct);
-        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, "Athlete", tier);
+        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, "Athlete", tier, trialDays);
+
+        _ = emailService.SendWelcomeAsync(user.Email!, user.DisplayName, ct);
 
         return Results.Ok(new AuthResponse(accessToken, refreshToken, expiresAt, userInfo));
     }
@@ -88,9 +92,11 @@ public static class AuthEndpoints
         var roles = await userManager.GetRolesAsync(user);
         var role = roles.FirstOrDefault();
         var effectiveTier = await subscriptionService.GetEffectiveTierAsync(user.Id, ct);
+        var subscription = await subscriptionService.GetSubscriptionAsync(user.Id, ct);
+        var trialDays = subscription is not null ? subscriptionService.GetTrialDaysRemaining(subscription) : null;
 
         var (accessToken, refreshToken, expiresAt) = await jwtService.GenerateTokensAsync(user, ct);
-        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, role, effectiveTier.ToString());
+        var userInfo = new UserInfoResponse(user.Id, user.Email!, user.DisplayName, role, effectiveTier.ToString(), trialDays);
 
         return Results.Ok(new AuthResponse(accessToken, refreshToken, expiresAt, userInfo));
     }
@@ -124,9 +130,11 @@ public static class AuthEndpoints
 
         var roles = await userManager.GetRolesAsync(user);
         var effectiveTier = await subscriptionService.GetEffectiveTierAsync(user.Id, ct);
+        var subscription = await subscriptionService.GetSubscriptionAsync(user.Id, ct);
+        var trialDays = subscription is not null ? subscriptionService.GetTrialDaysRemaining(subscription) : null;
 
         return Results.Ok(new UserInfoResponse(
             user.Id, user.Email!, user.DisplayName,
-            roles.FirstOrDefault(), effectiveTier.ToString()));
+            roles.FirstOrDefault(), effectiveTier.ToString(), trialDays));
     }
 }
