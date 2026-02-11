@@ -1,0 +1,62 @@
+@page "/"
+
+<PageTitle>FitSpiralS - Adaptive Training</PageTitle>
+
+<div class="hero-section">
+    <MudContainer MaxWidth="MaxWidth.Medium">
+        <h1>Train Smarter, Not Harder</h1>
+        <p>Periodized programming with RPE autoregulation, fatigue modeling, and real-time analytics — all in one platform.</p>
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Large"
+                   Href="/register" Style="color:white">
+            Start Free Trial
+        </MudButton>
+    </MudContainer>
+</div>
+
+<div class="features-grid">
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-8">Everything You Need</MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="4">
+            <FeatureCard Icon="@Icons.Material.Filled.FitnessCenter"
+                         Title="Periodized Programming"
+                         Description="Auto-generated programs with linear, undulating, and block periodization." />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <FeatureCard Icon="@Icons.Material.Filled.Speed"
+                         Title="RPE Autoregulation"
+                         Description="Load adjustments based on your daily readiness using RPE and e1RM tracking." />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <FeatureCard Icon="@Icons.Material.Filled.Psychology"
+                         Title="Fatigue Modeling"
+                         Description="Track stimulus, fatigue, and recovery to optimize training volume." />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <FeatureCard Icon="@Icons.Material.Filled.Analytics"
+                         Title="Analytics Dashboard"
+                         Description="Charts for volume, intensity, e1RM trends, body composition, and more." />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <FeatureCard Icon="@Icons.Material.Filled.School"
+                         Title="Coach Platform"
+                         Description="Manage athletes, set alerts, modify programs, and track progress remotely." />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <FeatureCard Icon="@Icons.Material.Filled.Group"
+                         Title="Training Partners"
+                         Description="Share sessions, compare progress, and train together with partners." />
+        </MudItem>
+    </MudGrid>
+</div>
+
+<div class="pricing-section">
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-8">Simple Pricing</MudText>
+    <div class="pricing-cards">
+        <PricingCard TierName="Athlete" Price="20"
+                     Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking"])" />
+        <PricingCard TierName="Competitor" Price="45" Highlighted="true"
+                     Features="@(["Everything in Athlete", "Advanced analytics", "Training partners", "Goal tracking", "Insights engine", "Data export"])" />
+        <PricingCard TierName="Coach" Price="99"
+                     Features="@(["Everything in Competitor", "Manage up to 50 athletes", "Alert engine", "Program generation", "Coach dashboard"])" />
+    </div>
+</div>

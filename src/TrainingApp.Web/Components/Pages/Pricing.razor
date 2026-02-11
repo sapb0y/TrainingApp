@@ -1,0 +1,23 @@
+@page "/pricing"
+
+<PageTitle>Pricing - FitSpiralS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-12">
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2">Choose Your Plan</MudText>
+    <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
+        All plans include a 14-day free trial. No credit card required.
+    </MudText>
+
+    <div class="pricing-cards">
+        <PricingCard TierName="Athlete" Price="20"
+                     Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking", "Body composition"])" />
+        <PricingCard TierName="Competitor" Price="45" Highlighted="true"
+                     Features="@(["Everything in Athlete", "Advanced analytics & charts", "Training partners", "Shared sessions", "Goal tracking & insights", "CSV/JSON data export"])" />
+        <PricingCard TierName="Coach" Price="99"
+                     Features="@(["Everything in Competitor", "Up to 50 athletes", "Alert engine (6 types)", "Program generation for athletes", "Coach dashboard & notes", "Athlete progress overview"])" />
+    </div>
+
+    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-8">
+        Questions? Contact us at support@fitspirals.com
+    </MudText>
+</MudContainer>

@@ -1,0 +1,96 @@
+@page "/register"
+@using Microsoft.AspNetCore.Identity
+@using TrainingApp.Core.Entities
+@inject UserManager<User> UserManager
+@inject SignInManager<User> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Register - FitSpiralS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-12">
+    <MudCard Elevation="2">
+        <MudCardContent Class="pa-8">
+            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-6">Create Account</MudText>
+
+            @if (_errors.Count > 0)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">
+                    @foreach (var err in _errors)
+                    {
+                        <div>@err</div>
+                    }
+                </MudAlert>
+            }
+
+            <EditForm Model="Input" FormName="register" OnValidSubmit="RegisterAsync" method="post">
+                <DataAnnotationsValidator />
+
+                <MudTextField @bind-Value="Input!.DisplayName" Label="Display Name"
+                              Required="true" Class="mb-4" />
+                <MudTextField @bind-Value="Input!.Email" Label="Email" InputType="InputType.Email"
+                              Required="true" Class="mb-4" />
+                <MudTextField @bind-Value="Input!.Password" Label="Password" InputType="InputType.Password"
+                              Required="true" Class="mb-4" />
+                <MudTextField @bind-Value="Input!.ConfirmPassword" Label="Confirm Password"
+                              InputType="InputType.Password" Required="true" Class="mb-4" />
+
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled"
+                           Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="mb-4">
+                    Create Account
+                </MudButton>
+            </EditForm>
+
+            <MudText Typo="Typo.body2" Align="Align.Center">
+                Already have an account? <MudLink Href="/login">Sign in</MudLink>
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromForm]
+    private RegisterModel? Input { get; set; }
+
+    private List<string> _errors = [];
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task RegisterAsync()
+    {
+        _errors.Clear();
+
+        if (Input!.Password != Input.ConfirmPassword)
+        {
+            _errors.Add("Passwords do not match.");
+            return;
+        }
+
+        var user = new User
+        {
+            UserName = Input.Email,
+            Email = Input.Email,
+            DisplayName = Input.DisplayName,
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (result.Succeeded)
+        {
+            await UserManager.AddToRoleAsync(user, "Athlete");
+            await SignInManager.SignInAsync(user, isPersistent: true);
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            _errors.AddRange(result.Errors.Select(e => e.Description));
+        }
+    }
+
+    private sealed class RegisterModel
+    {
+        public string DisplayName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

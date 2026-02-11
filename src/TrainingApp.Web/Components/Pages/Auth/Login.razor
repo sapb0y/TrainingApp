@@ -1,0 +1,68 @@
+@page "/login"
+@using Microsoft.AspNetCore.Identity
+@using TrainingApp.Core.Entities
+@inject SignInManager<User> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Login - FitSpiralS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-12">
+    <MudCard Elevation="2">
+        <MudCardContent Class="pa-8">
+            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-6">Sign In</MudText>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+            }
+
+            <EditForm Model="Input" FormName="login" OnValidSubmit="LoginAsync" method="post">
+                <DataAnnotationsValidator />
+
+                <MudTextField @bind-Value="Input!.Email" Label="Email" InputType="InputType.Email"
+                              Required="true" Class="mb-4" />
+                <MudTextField @bind-Value="Input!.Password" Label="Password" InputType="InputType.Password"
+                              Required="true" Class="mb-4" />
+
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled"
+                           Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="mb-4">
+                    Sign In
+                </MudButton>
+            </EditForm>
+
+            <MudText Typo="Typo.body2" Align="Align.Center">
+                Don't have an account? <MudLink Href="/register">Register</MudLink>
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginModel? Input { get; set; }
+
+    private string? _error;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task LoginAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input!.Email, Input.Password, isPersistent: true, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/admin", forceLoad: true);
+        }
+        else
+        {
+            _error = "Invalid email or password.";
+        }
+    }
+
+    private sealed class LoginModel
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}
