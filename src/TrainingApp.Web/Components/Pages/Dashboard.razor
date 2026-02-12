@@ -1,11 +1,8 @@
 @page "/dashboard"
-@using Microsoft.EntityFrameworkCore
-@using TrainingApp.Core.Entities
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Core.Services
-@using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@inject IUserDashboardService DashboardService
 @inject ICurrentUserService CurrentUser
 
 <PageTitle>Dashboard — FitSpiralS</PageTitle>
@@ -14,38 +11,35 @@
     <div class="fs-dashboard-inner">
         <h1 class="fs-animate">Your Dashboard</h1>
 
-        @if (!CurrentUser.IsAuthenticated)
-        {
-            <p>Please log in to view your dashboard.</p>
-        }
-        else if (_loading)
+        @if (_data is null)
         {
             <p class="fs-dashboard-loading fs-animate">Loading your data...</p>
         }
         else
         {
+            var summary = _data.Summary;
             <div class="fs-dash-grid fs-animate fs-delay-1">
                 @* ── Strength ── *@
                 <div class="fs-dash-card">
                     <h3>Strength</h3>
-                    @if (_summary is not null && _summary.Strength.ExercisesTracked > 0)
+                    @if (summary.Strength.ExercisesTracked > 0)
                     {
                         <div class="fs-dash-stat">
-                            <span class="fs-dash-value">@_summary.Strength.ExercisesTracked</span>
+                            <span class="fs-dash-value">@summary.Strength.ExercisesTracked</span>
                             <span class="fs-dash-label">Exercises tracked</span>
                         </div>
-                        @if (_summary.Strength.TopE1rm.HasValue)
+                        @if (summary.Strength.TopE1rm.HasValue)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value">@_summary.Strength.TopE1rm.Value.ToString("N1") kg</span>
-                                <span class="fs-dash-label">Top e1RM — @_summary.Strength.TopExercise</span>
+                                <span class="fs-dash-value">@summary.Strength.TopE1rm.Value.ToString("N1") kg</span>
+                                <span class="fs-dash-label">Top e1RM — @summary.Strength.TopExercise</span>
                             </div>
                         }
-                        @if (_summary.Strength.E1rmChangePct30d.HasValue)
+                        @if (summary.Strength.E1rmChangePct30d.HasValue)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value fs-dash-change @(_summary.Strength.E1rmChangePct30d.Value >= 0 ? "positive" : "negative")">
-                                    @(_summary.Strength.E1rmChangePct30d.Value >= 0 ? "+" : "")@_summary.Strength.E1rmChangePct30d.Value.ToString("N1")%
+                                <span class="fs-dash-value fs-dash-change @(summary.Strength.E1rmChangePct30d.Value >= 0 ? "positive" : "negative")">
+                                    @(summary.Strength.E1rmChangePct30d.Value >= 0 ? "+" : "")@summary.Strength.E1rmChangePct30d.Value.ToString("N1")%
                                 </span>
                                 <span class="fs-dash-label">30-day change</span>
                             </div>
@@ -60,23 +54,23 @@
                 @* ── Body Weight ── *@
                 <div class="fs-dash-card">
                     <h3>Body Weight</h3>
-                    @if (_summary is not null && _summary.BodyWeight.CurrentKg.HasValue)
+                    @if (summary.BodyWeight.CurrentKg.HasValue)
                     {
                         <div class="fs-dash-stat">
-                            <span class="fs-dash-value">@_summary.BodyWeight.CurrentKg.Value.ToString("N1") kg</span>
+                            <span class="fs-dash-value">@summary.BodyWeight.CurrentKg.Value.ToString("N1") kg</span>
                             <span class="fs-dash-label">Current</span>
                         </div>
-                        @if (_summary.BodyWeight.MovingAvg7d.HasValue)
+                        @if (summary.BodyWeight.MovingAvg7d.HasValue)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value">@_summary.BodyWeight.MovingAvg7d.Value.ToString("N1") kg</span>
+                                <span class="fs-dash-value">@summary.BodyWeight.MovingAvg7d.Value.ToString("N1") kg</span>
                                 <span class="fs-dash-label">7-day average</span>
                             </div>
                         }
-                        @if (_summary.BodyWeight.Trend is not null)
+                        @if (summary.BodyWeight.Trend is not null)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value">@_summary.BodyWeight.Trend</span>
+                                <span class="fs-dash-value">@summary.BodyWeight.Trend</span>
                                 <span class="fs-dash-label">Trend</span>
                             </div>
                         }
@@ -91,17 +85,17 @@
                 <div class="fs-dash-card">
                     <h3>Activity (30 days)</h3>
                     <div class="fs-dash-stat">
-                        <span class="fs-dash-value">@_activeDays</span>
+                        <span class="fs-dash-value">@_data.ActiveDays</span>
                         <span class="fs-dash-label">Active days</span>
                     </div>
-                    @if (_summary is not null && _summary.Cardio.SessionsLast30d > 0)
+                    @if (summary.Cardio.SessionsLast30d > 0)
                     {
                         <div class="fs-dash-stat">
-                            <span class="fs-dash-value">@_summary.Cardio.SessionsLast30d</span>
+                            <span class="fs-dash-value">@summary.Cardio.SessionsLast30d</span>
                             <span class="fs-dash-label">Cardio sessions</span>
                         </div>
                         <div class="fs-dash-stat">
-                            <span class="fs-dash-value">@_summary.Cardio.MinutesLast30d min</span>
+                            <span class="fs-dash-value">@summary.Cardio.MinutesLast30d min</span>
                             <span class="fs-dash-label">Cardio time</span>
                         </div>
                     }
@@ -110,24 +104,24 @@
                 @* ── Volume (7 days) ── *@
                 <div class="fs-dash-card">
                     <h3>Volume (7 days)</h3>
-                    @if (_summary is not null && _summary.Volume.TotalSetsLast7d > 0)
+                    @if (summary.Volume.TotalSetsLast7d > 0)
                     {
                         <div class="fs-dash-stat">
-                            <span class="fs-dash-value">@_summary.Volume.TotalSetsLast7d</span>
+                            <span class="fs-dash-value">@summary.Volume.TotalSetsLast7d</span>
                             <span class="fs-dash-label">Total sets</span>
                         </div>
-                        @if (_summary.Volume.TotalVolumeLast7d.HasValue)
+                        @if (summary.Volume.TotalVolumeLast7d.HasValue)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value">@_summary.Volume.TotalVolumeLast7d.Value.ToString("N0") kg</span>
+                                <span class="fs-dash-value">@summary.Volume.TotalVolumeLast7d.Value.ToString("N0") kg</span>
                                 <span class="fs-dash-label">Total volume</span>
                             </div>
                         }
-                        @if (_summary.Volume.VolumeChangePctVsPrev7d.HasValue)
+                        @if (summary.Volume.VolumeChangePctVsPrev7d.HasValue)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value fs-dash-change @(_summary.Volume.VolumeChangePctVsPrev7d.Value >= 0 ? "positive" : "negative")">
-                                    @(_summary.Volume.VolumeChangePctVsPrev7d.Value >= 0 ? "+" : "")@_summary.Volume.VolumeChangePctVsPrev7d.Value.ToString("N1")%
+                                <span class="fs-dash-value fs-dash-change @(summary.Volume.VolumeChangePctVsPrev7d.Value >= 0 ? "positive" : "negative")">
+                                    @(summary.Volume.VolumeChangePctVsPrev7d.Value >= 0 ? "+" : "")@summary.Volume.VolumeChangePctVsPrev7d.Value.ToString("N1")%
                                 </span>
                                 <span class="fs-dash-label">vs. previous week</span>
                             </div>
@@ -142,18 +136,18 @@
                 @* ── Fatigue / Readiness ── *@
                 <div class="fs-dash-card">
                     <h3>Readiness</h3>
-                    @if (_summary is not null && _summary.Fatigue.ReadinessCategory is not null)
+                    @if (summary.Fatigue.ReadinessCategory is not null)
                     {
                         <div class="fs-dash-stat">
-                            <span class="fs-dash-value fs-readiness-@(_summary.Fatigue.ReadinessCategory.ToLowerInvariant().Replace(" ", "-"))">
-                                @_summary.Fatigue.ReadinessCategory
+                            <span class="fs-dash-value fs-readiness-@(summary.Fatigue.ReadinessCategory.ToLowerInvariant().Replace(" ", "-"))">
+                                @summary.Fatigue.ReadinessCategory
                             </span>
                             <span class="fs-dash-label">Current readiness</span>
                         </div>
-                        @if (_summary.Fatigue.Tsb.HasValue)
+                        @if (summary.Fatigue.Tsb.HasValue)
                         {
                             <div class="fs-dash-stat">
-                                <span class="fs-dash-value">@_summary.Fatigue.Tsb.Value.ToString("N1")</span>
+                                <span class="fs-dash-value">@summary.Fatigue.Tsb.Value.ToString("N1")</span>
                                 <span class="fs-dash-label">TSB (form)</span>
                             </div>
                         }
@@ -167,10 +161,10 @@
                 @* ── Recent PRs ── *@
                 <div class="fs-dash-card">
                     <h3>Recent PRs</h3>
-                    @if (_recentPRs.Count > 0)
+                    @if (_data.RecentPRs.Count > 0)
                     {
                         <ul class="fs-dash-pr-list">
-                            @foreach (var pr in _recentPRs)
+                            @foreach (var pr in _data.RecentPRs)
                             {
                                 <li>
                                     <span class="fs-dash-pr-exercise">@pr.ExerciseName</span>
@@ -190,182 +184,13 @@
 </div>
 
 @code {
-    private bool _loading = true;
-    private ChartDataService.DashboardSummary? _summary;
-    private int _activeDays;
-    private List<PRInfo> _recentPRs = [];
+    private UserDashboardData? _data;
 
     protected override async Task OnInitializedAsync()
     {
-        if (!CurrentUser.IsAuthenticated)
-            return;
-
-        var userId = CurrentUser.UserId;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var thirtyDaysAgo = today.AddDays(-30);
-        var sevenDaysAgo = today.AddDays(-7);
-        var sixtyDaysAgo = today.AddDays(-60);
-
-        // ── Strength Snapshot ──
-        var recentSets = await Db.WorkoutSets
-            .AsNoTracking()
-            .Include(s => s.Workout)
-            .Include(s => s.Exercise)
-            .Where(s => s.Workout!.UserId == userId
-                && !s.IsWarmup
-                && s.ActualWeight != null && s.ActualReps != null
-                && s.ActualReps >= 1 && s.ActualReps <= 30
-                && s.Workout!.CompletedAt != null
-                && DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime) >= sixtyDaysAgo)
-            .Select(s => new
-            {
-                Date = DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime),
-                ExerciseName = s.Exercise!.Name,
-                E1rm = s.ActualWeight!.Value * (1 + s.ActualReps!.Value / 30m)
-            })
-            .ToListAsync();
-
-        var exerciseBests = recentSets
-            .Where(s => s.Date >= thirtyDaysAgo)
-            .GroupBy(s => s.ExerciseName)
-            .Select(g => new { Name = g.Key, BestE1rm = g.Max(s => s.E1rm) })
-            .ToList();
-
-        var topExercise = exerciseBests.OrderByDescending(e => e.BestE1rm).FirstOrDefault();
-
-        decimal? e1rmChangePct = null;
-        if (topExercise is not null)
+        if (CurrentUser.IsAuthenticated)
         {
-            var prevBest = recentSets
-                .Where(s => s.ExerciseName == topExercise.Name && s.Date >= sixtyDaysAgo && s.Date < thirtyDaysAgo)
-                .Select(s => s.E1rm)
-                .DefaultIfEmpty(0)
-                .Max();
-
-            if (prevBest > 0)
-                e1rmChangePct = Math.Round((topExercise.BestE1rm - prevBest) / prevBest * 100m, 1);
+            _data = await DashboardService.GetDashboardAsync(CurrentUser.UserId);
         }
-
-        var strengthSnapshot = new ChartDataService.StrengthSnapshot(
-            exerciseBests.Count, topExercise?.BestE1rm, topExercise?.Name, e1rmChangePct);
-
-        // ── Body Weight Snapshot ──
-        var latestWeight = await Db.WeightLogs
-            .AsNoTracking()
-            .Where(w => w.UserId == userId)
-            .OrderByDescending(w => w.Date)
-            .FirstOrDefaultAsync();
-
-        var weightTrend = "N/A";
-        if (latestWeight is not null)
-        {
-            var weightPoints = await Db.WeightLogs.AsNoTracking()
-                .Where(w => w.UserId == userId && w.Date >= thirtyDaysAgo)
-                .OrderBy(w => w.Date)
-                .Select(w => new { w.Date, w.WeightKg })
-                .ToListAsync();
-
-            weightTrend = ProgressAnalyticsService.DetectTrend(
-                weightPoints.Select(w => (w.Date, w.WeightKg)));
-        }
-
-        var bodyWeightSnapshot = new ChartDataService.BodyWeightSnapshot(
-            latestWeight?.WeightKg, latestWeight?.MovingAverage7d,
-            latestWeight?.WeeklyRateKg, weightTrend);
-
-        // ── Cardio Snapshot ──
-        var cardioSessions = await Db.CardioSessions
-            .AsNoTracking()
-            .Where(c => c.UserId == userId && c.Date >= thirtyDaysAgo)
-            .ToListAsync();
-
-        var cardioSnapshot = new ChartDataService.CardioSnapshot(
-            cardioSessions.Count,
-            cardioSessions.Sum(c => c.DurationMinutes),
-            cardioSessions.Where(c => c.DistanceKm.HasValue).Sum(c => c.DistanceKm),
-            cardioSessions.Count > 0
-                ? Math.Round(cardioSessions.Where(c => c.CardioTrimp.HasValue).Select(c => c.CardioTrimp!.Value).DefaultIfEmpty(0).Average(), 1)
-                : null);
-
-        // ── Fatigue Snapshot ──
-        var latestMetrics = await Db.DailyMetrics
-            .AsNoTracking()
-            .Where(m => m.UserId == userId)
-            .OrderByDescending(m => m.Date)
-            .FirstOrDefaultAsync();
-
-        string? readinessCategory = null;
-        if (latestMetrics?.ReadinessScore is not null)
-        {
-            readinessCategory = latestMetrics.ReadinessScore.Value switch
-            {
-                >= 8m => "Excellent",
-                >= 6m => "Good",
-                >= 4m => "Moderate",
-                >= 3m => "Poor",
-                _ => "Very Poor"
-            };
-        }
-
-        var fatigueSnapshot = new ChartDataService.FatigueSnapshot(
-            latestMetrics?.Ctl, latestMetrics?.Atl, latestMetrics?.Tsb, readinessCategory);
-
-        // ── Volume Snapshot ──
-        var last7dMetrics = await Db.DailyMetrics
-            .AsNoTracking()
-            .Where(m => m.UserId == userId && m.Date >= sevenDaysAgo)
-            .ToListAsync();
-
-        var prev7dMetrics = await Db.DailyMetrics
-            .AsNoTracking()
-            .Where(m => m.UserId == userId && m.Date >= sevenDaysAgo.AddDays(-7) && m.Date < sevenDaysAgo)
-            .ToListAsync();
-
-        var totalSets7d = last7dMetrics.Sum(m => m.TotalSets);
-        var totalVolume7d = last7dMetrics.Sum(m => m.TotalVolume);
-        var prevVolume7d = prev7dMetrics.Sum(m => m.TotalVolume);
-
-        decimal? volumeChangePct = null;
-        if (prevVolume7d > 0)
-            volumeChangePct = Math.Round((totalVolume7d - prevVolume7d) / prevVolume7d * 100m, 1);
-
-        var volumeSnapshot = new ChartDataService.VolumeSnapshot(
-            totalSets7d, totalVolume7d > 0 ? totalVolume7d : null, volumeChangePct);
-
-        // ── Active Days ──
-        var workoutDates = await Db.WorkoutSets
-            .AsNoTracking()
-            .Include(s => s.Workout)
-            .Where(s => s.Workout!.UserId == userId
-                && s.Workout!.CompletedAt != null
-                && DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime) >= thirtyDaysAgo)
-            .Select(s => DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime))
-            .Distinct()
-            .ToListAsync();
-
-        var cardioDates = await Db.CardioSessions
-            .AsNoTracking()
-            .Where(c => c.UserId == userId && c.Date >= thirtyDaysAgo)
-            .Select(c => c.Date)
-            .Distinct()
-            .ToListAsync();
-
-        _activeDays = workoutDates.Union(cardioDates).Distinct().Count();
-
-        // ── Personal Records ──
-        var allHistory = recentSets.Select(s => (s.Date, s.E1rm, s.ExerciseName));
-        _recentPRs = ProgressAnalyticsService.FindPersonalRecords(allHistory)
-            .Where(pr => pr.IsRecent)
-            .Take(5)
-            .Select(pr => new PRInfo(pr.ExerciseName, Math.Round(pr.BestE1rm, 1), pr.Date))
-            .ToList();
-
-        // ── Assemble ──
-        _summary = ChartDataService.CalculateDashboardSummary(
-            strengthSnapshot, bodyWeightSnapshot, cardioSnapshot, fatigueSnapshot, volumeSnapshot, _activeDays);
-
-        _loading = false;
     }
-
-    private sealed record PRInfo(string ExerciseName, decimal BestE1rm, DateOnly Date);
 }
