@@ -1,0 +1,155 @@
+@page "/app/programs"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject IProgramGeneratorService ProgramGen
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Programs — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Programs" Subtitle="Periodized training programs">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                   OnClick="() => _showGenerate = true">Generate Program</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_programs.Any())
+{
+    <EmptyState Message="No programs yet. Generate your first training program!"
+                Icon="@Icons.Material.Filled.EventNote"
+                ActionText="Generate" OnAction="() => _showGenerate = true" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var p in _programs.OrderByDescending(p => p.CreatedAt))
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E; cursor: pointer;"
+                         @onclick="() => GoToProgram(p.Id)">
+                    <MudCardContent>
+                        <div class="d-flex align-center justify-space-between mb-2">
+                            <MudText Typo="Typo.h6">@p.Name</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@ProgramStatusColor(p.Status)">@p.Status</MudChip>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @p.Goal · @p.Template · @p.DurationWeeks weeks
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                            Starts @p.StartDate.ToString("MMM d, yyyy") · @p.Phases.Count phases
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+</TierGate>
+
+@* ── Generate Dialog ── *@
+<MudDialog @bind-Visible="_showGenerate">
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_genName" Label="Program Name" Variant="Variant.Outlined" Class="mb-3" />
+        <MudSelect T="ProgramGoal" @bind-Value="_genGoal" Label="Goal" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var g in Enum.GetValues<ProgramGoal>())
+            {
+                <MudSelectItem T="ProgramGoal" Value="g">@g</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="ProgramTemplate" @bind-Value="_genTemplate" Label="Template" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var t in Enum.GetValues<ProgramTemplate>())
+            {
+                <MudSelectItem T="ProgramTemplate" Value="t">@t</MudSelectItem>
+            }
+        </MudSelect>
+        <MudGrid Spacing="2">
+            <MudItem xs="6">
+                <MudNumericField T="int" @bind-Value="_genWeeks" Label="Duration (weeks)" Variant="Variant.Outlined" Min="4" Max="16" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudDatePicker Label="Start Date" @bind-Date="_genStart" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showGenerate = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Generate"
+                   Disabled="@(string.IsNullOrWhiteSpace(_genName) || _generating)">
+            @if (_generating) { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
+            Generate
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private List<ProgramEntity> _programs = [];
+
+    // Generate form
+    private bool _showGenerate;
+    private bool _generating;
+    private string _genName = "";
+    private ProgramGoal _genGoal = ProgramGoal.Hypertrophy;
+    private ProgramTemplate _genTemplate = ProgramTemplate.PushPullLegs;
+    private int _genWeeks = 8;
+    private DateTime? _genStart = DateTime.Today;
+
+    @using ProgramEntity = TrainingApp.Core.Entities.Program
+
+    protected override async Task OnInitializedAsync()
+    {
+        _programs = await Db.Programs.AsNoTracking()
+            .Include(p => p.Phases)
+            .Where(p => p.UserId == CurrentUser.UserId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+        _loading = false;
+    }
+
+    private void GoToProgram(Guid id) => Nav.NavigateTo($"/app/programs/{id}");
+
+    private async Task Generate()
+    {
+        if (string.IsNullOrWhiteSpace(_genName)) return;
+        _generating = true;
+        try
+        {
+            var start = _genStart.HasValue ? DateOnly.FromDateTime(_genStart.Value) : DateOnly.FromDateTime(DateTime.Today);
+            var program = await ProgramGen.GenerateProgramAsync(
+                CurrentUser.UserId, _genName.Trim(), _genGoal, _genTemplate, _genWeeks, start);
+
+            _showGenerate = false;
+            Snackbar.Add("Program generated!", Severity.Success);
+            Nav.NavigateTo($"/app/programs/{program.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally { _generating = false; }
+    }
+
+    private static Color ProgramStatusColor(ProgramStatus s) => s switch
+    {
+        ProgramStatus.Active => Color.Success,
+        ProgramStatus.Draft => Color.Info,
+        ProgramStatus.Completed => Color.Default,
+        ProgramStatus.Archived => Color.Default,
+        _ => Color.Default
+    };
+}

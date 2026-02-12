@@ -1,0 +1,175 @@
+@page "/app/programs/{ProgramId:guid}"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@using ProgramEntity = TrainingApp.Core.Entities.Program
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Program — FitSpiralS</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_program is null)
+{
+    <EmptyState Message="Program not found" Icon="@Icons.Material.Filled.Error" />
+}
+else
+{
+    <PageHeader Title="@_program.Name" Subtitle="@($"{_program.Goal} · {_program.Template} · {_program.DurationWeeks} weeks")">
+        <Actions>
+            @if (_program.Status == ProgramStatus.Draft)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Activate" Class="mr-2">Activate</MudButton>
+            }
+            else if (_program.Status == ProgramStatus.Active)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="Complete" Class="mr-2">Complete</MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="Delete">Delete</MudButton>
+        </Actions>
+    </PageHeader>
+
+    <MudPaper Elevation="0" Class="pa-3 mb-4 d-flex align-center gap-3" Style="border: 1px solid #1F1F2E;">
+        <MudChip T="string" Size="Size.Small" Color="@StatusColor(_program.Status)">@_program.Status</MudChip>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Start: @_program.StartDate.ToString("MMM d, yyyy")
+        </MudText>
+        @if (!string.IsNullOrEmpty(_program.Description))
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@_program.Description</MudText>
+        }
+    </MudPaper>
+
+    @* ── Phases ── *@
+    @foreach (var phase in _program.Phases.OrderBy(p => p.OrderIndex))
+    {
+        <MudExpansionPanels Class="mb-3">
+            <MudExpansionPanel Style="border: 1px solid #1F1F2E; background: transparent;">
+                <TitleContent>
+                    <div class="d-flex align-center gap-2">
+                        <MudChip T="string" Size="Size.Small" Color="@PhaseColor(phase.Type)">@phase.Type</MudChip>
+                        <MudText Typo="Typo.subtitle1"><b>@phase.Name</b></MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @phase.DurationWeeks weeks · RIR @phase.TargetRir · Vol ×@phase.VolumeMultiplier.ToString("N1")
+                        </MudText>
+                    </div>
+                </TitleContent>
+                <ChildContent>
+                    @foreach (var workout in phase.Workouts.OrderBy(w => w.OrderIndex))
+                    {
+                        <MudCard Elevation="0" Class="mb-2 pa-3" Style="border: 1px solid #1F1F2E;">
+                            <div class="d-flex align-center gap-2 mb-2">
+                                <MudText Typo="Typo.subtitle1"><b>Day @workout.DayNumber: @workout.Name</b></MudText>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">@workout.Focus</MudChip>
+                            </div>
+                            @if (workout.Exercises.Any())
+                            {
+                                <MudSimpleTable Dense="true" Style="background: transparent;">
+                                    <thead>
+                                        <tr>
+                                            <th>Exercise</th>
+                                            <th>Sets</th>
+                                            <th>Reps</th>
+                                            <th>RPE</th>
+                                            <th>Rest</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var ex in workout.Exercises.OrderBy(e => e.OrderIndex))
+                                        {
+                                            <tr>
+                                                <td>
+                                                    @(ex.Exercise?.Name ?? "Exercise")
+                                                    @if (!string.IsNullOrEmpty(ex.SupersetGroup))
+                                                    {
+                                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">SS @ex.SupersetGroup</MudChip>
+                                                    }
+                                                </td>
+                                                <td>@ex.TargetSets</td>
+                                                <td>@ex.TargetRepsMin-@ex.TargetRepsMax</td>
+                                                <td>@(ex.TargetRpe?.ToString("N1") ?? "—")</td>
+                                                <td>@ex.RestSeconds s</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        </MudCard>
+                    }
+                </ChildContent>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+}
+
+@code {
+    [Parameter] public Guid ProgramId { get; set; }
+
+    private bool _loading = true;
+    private ProgramEntity? _program;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _program = await Db.Programs.AsNoTracking()
+            .Include(p => p.Phases).ThenInclude(ph => ph.Workouts).ThenInclude(w => w.Exercises).ThenInclude(e => e.Exercise)
+            .FirstOrDefaultAsync(p => p.Id == ProgramId && p.UserId == CurrentUser.UserId);
+        _loading = false;
+    }
+
+    private async Task Activate()
+    {
+        if (_program is null) return;
+        var tracked = await Db.Programs.FindAsync(_program.Id);
+        if (tracked is null) return;
+        tracked.Status = ProgramStatus.Active;
+        await Db.SaveChangesAsync();
+        _program.Status = ProgramStatus.Active;
+        Snackbar.Add("Program activated", Severity.Success);
+    }
+
+    private async Task Complete()
+    {
+        if (_program is null) return;
+        var tracked = await Db.Programs.FindAsync(_program.Id);
+        if (tracked is null) return;
+        tracked.Status = ProgramStatus.Completed;
+        await Db.SaveChangesAsync();
+        _program.Status = ProgramStatus.Completed;
+        Snackbar.Add("Program completed", Severity.Success);
+    }
+
+    private async Task Delete()
+    {
+        if (_program is null) return;
+        var tracked = await Db.Programs.FindAsync(_program.Id);
+        if (tracked is null) return;
+        Db.Programs.Remove(tracked);
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/app/programs");
+    }
+
+    private static Color StatusColor(ProgramStatus s) => s switch
+    {
+        ProgramStatus.Active => Color.Success,
+        ProgramStatus.Draft => Color.Info,
+        ProgramStatus.Completed => Color.Default,
+        _ => Color.Default
+    };
+
+    private static Color PhaseColor(PhaseType t) => t switch
+    {
+        PhaseType.Accumulation => Color.Primary,
+        PhaseType.Intensification => Color.Warning,
+        PhaseType.Deload => Color.Success,
+        _ => Color.Default
+    };
+}

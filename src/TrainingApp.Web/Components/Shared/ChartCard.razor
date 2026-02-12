@@ -1,0 +1,33 @@
+<MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+    <div class="d-flex align-center justify-space-between mb-2">
+        <MudText Typo="Typo.h6">@Title</MudText>
+        @if (ShowDateRange)
+        {
+            <div class="d-flex gap-2">
+                @foreach (var opt in _rangeOptions)
+                {
+                    <MudButton Variant="@(opt == SelectedDays ? Variant.Filled : Variant.Outlined)"
+                               Color="Color.Primary" Size="Size.Small"
+                               OnClick="() => OnRangeSelected(opt)">@opt d</MudButton>
+                }
+            </div>
+        }
+    </div>
+    @ChildContent
+</MudPaper>
+
+@code {
+    [Parameter] public required string Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool ShowDateRange { get; set; } = true;
+    [Parameter] public int SelectedDays { get; set; } = 30;
+    [Parameter] public EventCallback<int> SelectedDaysChanged { get; set; }
+
+    private static readonly int[] _rangeOptions = [7, 30, 60, 90];
+
+    private async Task OnRangeSelected(int days)
+    {
+        SelectedDays = days;
+        await SelectedDaysChanged.InvokeAsync(days);
+    }
+}

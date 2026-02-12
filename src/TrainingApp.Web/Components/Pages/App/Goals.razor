@@ -1,0 +1,170 @@
+@page "/app/goals"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IGoalTrackingService GoalService
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Goals — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Goals" Subtitle="Track your fitness goals">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="() => _showCreate = true">New Goal</MudButton>
+    </Actions>
+</PageHeader>
+
+@* ── Filters ── *@
+<MudChipSet T="GoalStatus?" SelectedValue="_statusFilter" SelectedValueChanged="OnFilterChanged" Class="mb-3">
+    <MudChip T="GoalStatus?" Value="@((GoalStatus?)null)" Color="Color.Default">All</MudChip>
+    <MudChip T="GoalStatus?" Value="GoalStatus.Active" Color="Color.Primary">Active</MudChip>
+    <MudChip T="GoalStatus?" Value="GoalStatus.Achieved" Color="Color.Success">Achieved</MudChip>
+    <MudChip T="GoalStatus?" Value="GoalStatus.Abandoned" Color="Color.Default">Abandoned</MudChip>
+</MudChipSet>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_goals.Any())
+{
+    <EmptyState Message="No goals yet. Set a target to work towards!"
+                Icon="@Icons.Material.Filled.Flag"
+                ActionText="Create Goal" OnAction="() => _showCreate = true" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var g in _goals)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E; cursor: pointer;"
+                         @onclick="() => GoToGoal(g.Id)">
+                    <MudCardContent>
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="Typo.subtitle1"><b>@g.Title</b></MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@GoalStatusColor(g.Status)">@g.Status</MudChip>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mb-2">@g.Type</MudChip>
+                        @if (g.TargetValue.HasValue && g.StartValue.HasValue)
+                        {
+                            var progress = CalculateProgress(g);
+                            <MudProgressLinear Value="@progress" Color="Color.Primary" Class="my-2" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @g.StartValue.Value.ToString("N1") → @g.TargetValue.Value.ToString("N1") @(g.TargetUnit ?? "")
+                                (@progress.ToString("N0")%)
+                            </MudText>
+                        }
+                        @if (g.TargetDate.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Target: @g.TargetDate.Value.ToString("MMM d, yyyy")
+                            </MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+</TierGate>
+
+@* ── Create Dialog ── *@
+<MudDialog @bind-Visible="_showCreate">
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_newTitle" Label="Goal Title" Variant="Variant.Outlined" Class="mb-3" />
+        <MudSelect T="GoalType" @bind-Value="_newType" Label="Type" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var t in Enum.GetValues<GoalType>())
+            {
+                <MudSelectItem T="GoalType" Value="t">@t</MudSelectItem>
+            }
+        </MudSelect>
+        <MudGrid Spacing="2" Class="mb-3">
+            <MudItem xs="6">
+                <MudNumericField T="decimal?" @bind-Value="_newStart" Label="Start Value" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="decimal?" @bind-Value="_newTarget" Label="Target Value" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudTextField T="string" @bind-Value="_newUnit" Label="Unit (kg, min, etc.)" Variant="Variant.Outlined" Class="mb-3" />
+        <MudDatePicker Label="Target Date" @bind-Date="_newDate" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_newNotes" Label="Notes" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCreate = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create"
+                   Disabled="string.IsNullOrWhiteSpace(_newTitle)">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private List<Goal> _goals = [];
+    private GoalStatus? _statusFilter;
+
+    // Create form
+    private bool _showCreate;
+    private string _newTitle = "";
+    private GoalType _newType = GoalType.Strength;
+    private decimal? _newStart;
+    private decimal? _newTarget;
+    private string? _newUnit;
+    private DateTime? _newDate;
+    private string? _newNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGoals();
+        _loading = false;
+    }
+
+    private void GoToGoal(Guid id) => Nav.NavigateTo($"/app/goals/{id}");
+
+    private async Task LoadGoals()
+    {
+        _goals = await GoalService.GetGoalsAsync(CurrentUser.UserId, _statusFilter, default);
+    }
+
+    private async Task OnFilterChanged(GoalStatus? status)
+    {
+        _statusFilter = status;
+        await LoadGoals();
+    }
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(_newTitle)) return;
+        var targetDate = _newDate.HasValue ? DateOnly.FromDateTime(_newDate.Value) : (DateOnly?)null;
+        await GoalService.CreateGoalAsync(CurrentUser.UserId, _newTitle.Trim(), _newType,
+            _newTarget, _newUnit, null, _newStart, targetDate, _newNotes, default);
+
+        _showCreate = false;
+        await LoadGoals();
+        Snackbar.Add("Goal created", Severity.Success);
+    }
+
+    private static double CalculateProgress(Goal g)
+    {
+        if (!g.TargetValue.HasValue || !g.StartValue.HasValue || g.TargetValue == g.StartValue) return 0;
+        var latest = g.Checkpoints.OrderByDescending(c => c.Date).FirstOrDefault()?.Value ?? g.StartValue.Value;
+        var total = g.TargetValue.Value - g.StartValue.Value;
+        var current = latest - g.StartValue.Value;
+        return Math.Clamp((double)(current / total * 100), 0, 100);
+    }
+
+    private static Color GoalStatusColor(GoalStatus s) => s switch
+    {
+        GoalStatus.Active => Color.Primary,
+        GoalStatus.Achieved => Color.Success,
+        GoalStatus.Abandoned => Color.Default,
+        _ => Color.Default
+    };
+}
