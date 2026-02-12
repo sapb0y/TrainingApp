@@ -1,0 +1,401 @@
+@page "/app/workouts/{WorkoutId:guid}"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject IAutoregulationExecutionService AutoregService
+@inject IExerciseCacheService ExerciseCache
+@inject IFatigueModelService FatigueService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Workout — FitSpiralS</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_workout is null)
+{
+    <EmptyState Message="Workout not found" Icon="@Icons.Material.Filled.Error" />
+}
+else
+{
+    <PageHeader Title="@_workout.Name" Subtitle="@_workout.ScheduledAt.LocalDateTime.ToString("ddd, MMM d yyyy")">
+        <Actions>
+            @if (_workout.Status == WorkoutStatus.Planned)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow"
+                           OnClick="StartWorkout" Class="mr-2">Start</MudButton>
+            }
+            else if (_workout.Status == WorkoutStatus.InProgress)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
+                           OnClick="CompleteWorkout" Class="mr-2">Complete</MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteWorkout">Delete</MudButton>
+        </Actions>
+    </PageHeader>
+
+    @* ── Status + Readiness Bar ── *@
+    <MudPaper Elevation="0" Class="pa-3 mb-4 d-flex align-center gap-4" Style="border: 1px solid #1F1F2E;">
+        <MudChip T="string" Color="@StatusColor(_workout.Status)" Size="Size.Small">@_workout.Status</MudChip>
+        @if (_readiness is not null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Readiness: <b>@ReadinessLabel(_readiness.ReadinessScore)</b>
+                @if (_readiness.Tsb != 0) { <span> · TSB @_readiness.Tsb.ToString("N1")</span> }
+            </MudText>
+        }
+        @if (_workout.SessionRpe.HasValue)
+        {
+            <MudText Typo="Typo.body2">Session RPE: <b>@_workout.SessionRpe</b></MudText>
+        }
+    </MudPaper>
+
+    @* ── Recommendations ── *@
+    @if (_recommendations is not null && _recommendations.Exercises.Count > 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+            <MudText Typo="Typo.body2"><b>Autoregulation Recommendations:</b></MudText>
+            @foreach (var rec in _recommendations.Exercises.Take(3))
+            {
+                <MudText Typo="Typo.body2">@rec.Reason</MudText>
+            }
+        </MudAlert>
+    }
+
+    @* ── Sets Table ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <div class="d-flex align-center justify-space-between mb-3">
+            <MudText Typo="Typo.h6">Sets</MudText>
+            @if (_workout.Status != WorkoutStatus.Completed && _workout.Status != WorkoutStatus.Skipped)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddSet">Add Set</MudButton>
+            }
+        </div>
+
+        @if (!_sets.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No sets yet. Add exercises to start.</MudText>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Exercise</th>
+                        <th>Target</th>
+                        <th>Actual</th>
+                        <th>RPE</th>
+                        <th>e1RM</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in _sets.OrderBy(s => s.SetNumber))
+                    {
+                        <tr style="@(s.IsWarmup ? "opacity:0.6" : "")">
+                            <td>
+                                @s.SetNumber
+                                @if (s.IsWarmup) { <MudChip T="string" Size="Size.Small" Color="Color.Default">W</MudChip> }
+                            </td>
+                            <td>@(s.Exercise?.Name ?? "—")</td>
+                            <td>@FormatTarget(s)</td>
+                            <td>
+                                @if (_workout.Status == WorkoutStatus.InProgress && !s.CompletedAt.HasValue)
+                                {
+                                    <div class="d-flex gap-2 align-center">
+                                        <MudNumericField T="decimal?" @bind-Value="s.ActualWeight" Label="kg" Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense" Style="max-width:80px" />
+                                        <MudNumericField T="int?" @bind-Value="s.ActualReps" Label="reps" Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense" Style="max-width:70px" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small"
+                                                       OnClick="() => CompleteSet(s)" />
+                                    </div>
+                                }
+                                else
+                                {
+                                    @FormatActual(s)
+                                }
+                            </td>
+                            <td>
+                                @if (_workout.Status == WorkoutStatus.InProgress && !s.CompletedAt.HasValue)
+                                {
+                                    <MudNumericField T="decimal?" @bind-Value="s.Rpe" Label="RPE" Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense" Style="max-width:70px" Min="1" Max="10" Step="0.5m" />
+                                }
+                                else
+                                {
+                                    @(s.Rpe?.ToString("N1") ?? "—")
+                                }
+                            </td>
+                            <td>@(s.EstimatedOneRepMax?.ToString("N1") ?? "—")</td>
+                            <td>
+                                @if (_workout.Status != WorkoutStatus.Completed)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                   OnClick="() => DeleteSet(s)" />
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+
+    @* ── Notes ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-2">Notes</MudText>
+        <MudTextField T="string" @bind-Value="_workout.Notes" Lines="3" Variant="Variant.Outlined"
+                      Placeholder="Workout notes..." />
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-2" OnClick="SaveNotes">Save Notes</MudButton>
+    </MudPaper>
+
+    @* ── Session RPE (on complete) ── *@
+    @if (_workout.Status == WorkoutStatus.InProgress)
+    {
+        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Session Rating</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="4">
+                    <MudNumericField T="int?" @bind-Value="_workout.SessionRpe" Label="Session RPE (1-10)"
+                                     Variant="Variant.Outlined" Min="1" Max="10" />
+                </MudItem>
+                <MudItem xs="4">
+                    <MudNumericField T="int?" @bind-Value="_workout.PreWorkoutReadiness" Label="Pre-Workout Readiness (1-10)"
+                                     Variant="Variant.Outlined" Min="1" Max="10" />
+                </MudItem>
+                <MudItem xs="4">
+                    <MudNumericField T="int?" @bind-Value="_workout.PostWorkoutFatigue" Label="Post-Workout Fatigue (1-10)"
+                                     Variant="Variant.Outlined" Min="1" Max="10" />
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+}
+
+@* ── Add Set Dialog ── *@
+<MudDialog @bind-Visible="_showAddSet">
+    <DialogContent>
+        <MudAutocomplete T="Exercise" Label="Exercise" @bind-Value="_selectedExercise"
+                         SearchFunc="SearchExercises" ToStringFunc="@(e => e?.Name ?? "")"
+                         Variant="Variant.Outlined" Class="mb-3" Margin="Margin.Dense" />
+        <MudGrid Spacing="2">
+            <MudItem xs="6">
+                <MudNumericField T="decimal?" @bind-Value="_newTargetWeight" Label="Target Weight (kg)"
+                                 Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_newTargetReps" Label="Target Reps"
+                                 Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_newTargetRir" Label="Target RIR"
+                                 Variant="Variant.Outlined" Min="0" Max="5" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudCheckBox T="bool" @bind-Value="_newIsWarmup" Label="Warmup set" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudNumericField T="int" @bind-Value="_newSetCount" Label="Number of Sets"
+                                 Variant="Variant.Outlined" Min="1" Max="10" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showAddSet = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAddSet"
+                   Disabled="_selectedExercise is null">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid WorkoutId { get; set; }
+
+    private bool _loading = true;
+    private Workout? _workout;
+    private List<WorkoutSet> _sets = [];
+    private DailyMetrics? _readiness;
+    private AutoregulationService.WorkoutEvaluation? _recommendations;
+
+    // Add set dialog
+    private bool _showAddSet;
+    private Exercise? _selectedExercise;
+    private decimal? _newTargetWeight;
+    private int? _newTargetReps = 8;
+    private int? _newTargetRir = 2;
+    private bool _newIsWarmup;
+    private int _newSetCount = 3;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _workout = await Db.Workouts
+            .Include(w => w.Sets).ThenInclude(s => s.Exercise)
+            .FirstOrDefaultAsync(w => w.Id == WorkoutId && w.UserId == CurrentUser.UserId);
+
+        if (_workout is null) { _loading = false; return; }
+
+        _sets = _workout.Sets.ToList();
+
+        _readiness = await FatigueService.GetReadinessAsync(CurrentUser.UserId);
+
+        try { _recommendations = await AutoregService.GetRecommendationsAsync(WorkoutId); }
+        catch { /* no recommendations if workout has no sets */ }
+
+        _loading = false;
+    }
+
+    private async Task StartWorkout()
+    {
+        if (_workout is null) return;
+        _workout.Status = WorkoutStatus.InProgress;
+        _workout.StartedAt = DateTimeOffset.UtcNow;
+        await Db.SaveChangesAsync();
+        Snackbar.Add("Workout started!", Severity.Success);
+    }
+
+    private async Task CompleteWorkout()
+    {
+        if (_workout is null) return;
+        _workout.Status = WorkoutStatus.Completed;
+        _workout.CompletedAt = DateTimeOffset.UtcNow;
+        await Db.SaveChangesAsync();
+
+        // Update fatigue metrics
+        try
+        {
+            await FatigueService.UpdateDailyMetricsAsync(
+                CurrentUser.UserId, DateOnly.FromDateTime(DateTime.UtcNow));
+        }
+        catch { /* non-critical */ }
+
+        Snackbar.Add("Workout completed!", Severity.Success);
+    }
+
+    private async Task DeleteWorkout()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Delete Workout", "Are you sure? This cannot be undone.", "Delete", "Cancel");
+        if (confirmed != true || _workout is null) return;
+
+        Db.Workouts.Remove(_workout);
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/app/workouts");
+    }
+
+    private async Task CompleteSet(WorkoutSet set)
+    {
+        set.CompletedAt = DateTimeOffset.UtcNow;
+        set.PerformedAt = DateTimeOffset.UtcNow;
+        await Db.SaveChangesAsync();
+        Snackbar.Add($"Set {set.SetNumber} logged", Severity.Success);
+    }
+
+    private async Task DeleteSet(WorkoutSet set)
+    {
+        Db.WorkoutSets.Remove(set);
+        _sets.Remove(set);
+        await Db.SaveChangesAsync();
+    }
+
+    private void OpenAddSet()
+    {
+        _selectedExercise = null;
+        _newTargetWeight = null;
+        _newTargetReps = 8;
+        _newTargetRir = 2;
+        _newIsWarmup = false;
+        _newSetCount = 3;
+        _showAddSet = true;
+    }
+
+    private async Task SubmitAddSet()
+    {
+        if (_selectedExercise is null || _workout is null) return;
+
+        var maxSet = _sets.Any() ? _sets.Max(s => s.SetNumber) : 0;
+
+        for (int i = 0; i < _newSetCount; i++)
+        {
+            var set = new WorkoutSet
+            {
+                Id = Guid.NewGuid(),
+                WorkoutId = _workout.Id,
+                ExerciseId = _selectedExercise.Id,
+                SetNumber = maxSet + i + 1,
+                TargetWeight = _newTargetWeight,
+                TargetReps = _newTargetReps,
+                TargetRir = _newTargetRir,
+                IsWarmup = _newIsWarmup
+            };
+            Db.WorkoutSets.Add(set);
+            set.Exercise = _selectedExercise;
+            _sets.Add(set);
+        }
+
+        await Db.SaveChangesAsync();
+        _showAddSet = false;
+        Snackbar.Add($"Added {_newSetCount} sets of {_selectedExercise.Name}", Severity.Success);
+    }
+
+    private async Task SaveNotes()
+    {
+        if (_workout is null) return;
+        await Db.SaveChangesAsync();
+        Snackbar.Add("Notes saved", Severity.Success);
+    }
+
+    private async Task<IEnumerable<Exercise>> SearchExercises(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return (await ExerciseCache.GetAllExercisesAsync(ct)).Take(20);
+        return await ExerciseCache.SearchAsync(value, ct);
+    }
+
+    private static string FormatTarget(WorkoutSet s)
+    {
+        var parts = new List<string>();
+        if (s.TargetWeight.HasValue) parts.Add($"{s.TargetWeight}kg");
+        if (s.TargetReps.HasValue) parts.Add($"{s.TargetReps}r");
+        if (s.TargetRir.HasValue) parts.Add($"@{s.TargetRir}RIR");
+        return parts.Count > 0 ? string.Join(" × ", parts) : "—";
+    }
+
+    private static string FormatActual(WorkoutSet s)
+    {
+        if (s.ActualWeight is null && s.ActualReps is null) return "—";
+        var parts = new List<string>();
+        if (s.ActualWeight.HasValue) parts.Add($"{s.ActualWeight}kg");
+        if (s.ActualReps.HasValue) parts.Add($"{s.ActualReps}r");
+        return string.Join(" × ", parts);
+    }
+
+    private static string ReadinessLabel(decimal? score) => score switch
+    {
+        >= 8 => "Excellent",
+        >= 6 => "Good",
+        >= 4 => "Moderate",
+        >= 3 => "Poor",
+        _ => "Low"
+    };
+
+    private static Color StatusColor(WorkoutStatus status) => status switch
+    {
+        WorkoutStatus.Planned => Color.Info,
+        WorkoutStatus.InProgress => Color.Warning,
+        WorkoutStatus.Completed => Color.Success,
+        _ => Color.Default
+    };
+}

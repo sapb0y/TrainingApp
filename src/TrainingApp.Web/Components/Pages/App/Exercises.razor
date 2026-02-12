@@ -1,0 +1,154 @@
+@page "/app/exercises"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IExerciseCacheService ExerciseCache
+
+<PageTitle>Exercises — FitSpiralS</PageTitle>
+
+<PageHeader Title="Exercise Library" Subtitle="Browse and search exercises" />
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" sm="6" md="4">
+        <MudTextField T="string" Value="_search" Label="Search exercises" Variant="Variant.Outlined"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" DebounceInterval="400" ValueChanged="OnSearchChanged" />
+    </MudItem>
+    <MudItem xs="12" sm="3" md="2">
+        <MudSelect T="string" Label="Category" Value="_categoryFilter" Clearable="true"
+                   Variant="Variant.Outlined" ValueChanged="OnCategoryChanged">
+            @foreach (var cat in _categories)
+            {
+                <MudSelectItem T="string" Value="@cat">@cat</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="12" sm="3" md="2">
+        <MudSelect T="string" Label="Muscle" Value="_muscleFilter" Clearable="true"
+                   Variant="Variant.Outlined" ValueChanged="OnMuscleChanged">
+            @foreach (var m in _muscles)
+            {
+                <MudSelectItem T="string" Value="@m">@m</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+</MudGrid>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-4" />
+}
+else if (!_filtered.Any())
+{
+    <EmptyState Message="No exercises match your search" Icon="@Icons.Material.Filled.SearchOff" />
+}
+else
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3 mb-2">@_filtered.Count exercises</MudText>
+
+    <MudGrid Spacing="2">
+        @foreach (var ex in _filtered.Take(_displayCount))
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;" Class="@(_selectedId == ex.Id ? "mud-border-primary" : "")"
+                         @onclick="() => ToggleDetail(ex.Id)">
+                    <MudCardContent Class="pa-3">
+                        <MudText Typo="Typo.subtitle1"><b>@ex.Name</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-1">@ex.Category</MudChip>
+                        @if (ex.PrimaryMuscles.Count > 0)
+                        {
+                            <div class="d-flex gap-1 flex-wrap mt-1">
+                                @foreach (var m in ex.PrimaryMuscles)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">@m</MudChip>
+                                }
+                            </div>
+                        }
+
+                        @if (_selectedId == ex.Id)
+                        {
+                            <MudDivider Class="my-2" />
+                            @if (ex.SecondaryMuscles.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Secondary: @string.Join(", ", ex.SecondaryMuscles)
+                                </MudText>
+                            }
+                            @if (ex.Equipment.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Equipment: @string.Join(", ", ex.Equipment)
+                                </MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(ex.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="mt-2">@StripHtml(ex.Description)</MudText>
+                            }
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @if (_displayCount < _filtered.Count)
+    {
+        <div class="d-flex justify-center mt-4">
+            <MudButton Variant="Variant.Text" Color="Color.Primary"
+                       OnClick="() => _displayCount += 20">Show More (@(_filtered.Count - _displayCount) remaining)</MudButton>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<Exercise> _allExercises = [];
+    private List<Exercise> _filtered = [];
+    private List<string> _categories = [];
+    private List<string> _muscles = [];
+
+    private string? _search;
+    private string? _categoryFilter;
+    private string? _muscleFilter;
+    private Guid? _selectedId;
+    private int _displayCount = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allExercises = await ExerciseCache.GetAllExercisesAsync();
+
+        _categories = _allExercises.Select(e => e.Category).Distinct().OrderBy(c => c).ToList();
+        _muscles = _allExercises.SelectMany(e => e.PrimaryMuscles).Distinct().OrderBy(m => m).ToList();
+
+        ApplyFilters();
+        _loading = false;
+    }
+
+    private void ApplyFilters()
+    {
+        var query = _allExercises.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(_search))
+            query = query.Where(e => e.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(_categoryFilter))
+            query = query.Where(e => e.Category == _categoryFilter);
+
+        if (!string.IsNullOrWhiteSpace(_muscleFilter))
+            query = query.Where(e => e.PrimaryMuscles.Contains(_muscleFilter));
+
+        _filtered = query.OrderBy(e => e.Name).ToList();
+        _displayCount = 20;
+    }
+
+    private void OnSearchChanged(string value) { _search = value; ApplyFilters(); }
+    private void OnCategoryChanged(string value) { _categoryFilter = value; ApplyFilters(); }
+    private void OnMuscleChanged(string value) { _muscleFilter = value; ApplyFilters(); }
+
+    private void ToggleDetail(Guid id) => _selectedId = _selectedId == id ? null : id;
+
+    private static string StripHtml(string html) =>
+        System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ").Trim();
+}
