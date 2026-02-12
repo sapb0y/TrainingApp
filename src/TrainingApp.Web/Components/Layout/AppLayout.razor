@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject ICurrentUserService CurrentUser
+@inject ISubscriptionService SubService
 @inject NavigationManager Nav
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Core.Entities
@@ -93,12 +94,37 @@
     </MudDrawer>
 
     <MudMainContent Style="min-height: 100vh; padding: 24px;">
+        @if (_noSubscription)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true">
+                Your account has no active subscription.
+                <MudLink Href="/app/subscription" Typo="Typo.body2" Color="Color.Warning" Class="ml-2">
+                    <b>Complete signup</b>
+                </MudLink>
+            </MudAlert>
+        }
         @Body
     </MudMainContent>
 </MudLayout>
 
 @code {
     private bool _drawerOpen = true;
+    private bool _noSubscription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var sub = await SubService.GetSubscriptionAsync(CurrentUser.UserId);
+            _noSubscription = sub is null ||
+                sub.Status == SubscriptionStatus.Expired ||
+                sub.Status == SubscriptionStatus.Cancelled;
+        }
+        catch
+        {
+            // Not authenticated yet or service error — don't block layout
+        }
+    }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 }

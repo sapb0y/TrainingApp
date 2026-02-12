@@ -172,4 +172,10 @@ public class FakePaymentService : IPaymentService
 
     public Task CancelSubscriptionAsync(string stripeSubscriptionId, CancellationToken ct = default)
         => Task.CompletedTask;
+
+    public Task<string> CreateSetupIntentAsync(string stripeCustomerId, CancellationToken ct = default)
+        => Task.FromResult("seti_fake_client_secret");
+
+    public Task<string> CreateSubscriptionWithTrialAsync(string stripeCustomerId, string priceId, int trialDays, CancellationToken ct = default)
+        => Task.FromResult("sub_fake_trial");
 }

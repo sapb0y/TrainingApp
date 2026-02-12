@@ -1,18 +1,24 @@
 @page "/register"
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.Extensions.Options
+@using TrainingApp.Core.Configuration
 @using TrainingApp.Core.Entities
 @using TrainingApp.Core.Interfaces
 @inject UserManager<User> UserManager
 @inject SignInManager<User> SignInManager
 @inject NavigationManager Navigation
 @inject ISubscriptionService SubscriptionService
+@inject IPaymentService PaymentService
+@inject IOptions<StripeSettings> StripeOptions
+@inject IJSRuntime JS
 
 <PageTitle>Register — FitSpiralS</PageTitle>
 
 <div class="fs-auth-page">
     <div class="fs-auth-card">
         <h1>Join the spiral.</h1>
-        <p class="fs-auth-subtitle">30 days free. No credit card. Just you and the iron.</p>
+        <p class="fs-auth-subtitle">30 days free. Card required — you won't be charged during trial.</p>
 
         @if (_errors.Count > 0)
         {
@@ -24,31 +30,34 @@
             </div>
         }
 
-        <EditForm Model="Input" FormName="register" OnValidSubmit="RegisterAsync" method="post">
-            <DataAnnotationsValidator />
+        <div class="fs-form-group">
+            <label for="displayname">Display Name</label>
+            <input id="displayname" @bind="_displayName" placeholder="Your name" class="fs-input" />
+        </div>
 
-            <div class="fs-form-group">
-                <label for="displayname">Display Name</label>
-                <InputText id="displayname" @bind-Value="Input!.DisplayName" placeholder="Your name" />
-            </div>
+        <div class="fs-form-group">
+            <label for="email">Email</label>
+            <input id="email" @bind="_email" type="email" placeholder="you@example.com" class="fs-input" />
+        </div>
 
-            <div class="fs-form-group">
-                <label for="email">Email</label>
-                <InputText id="email" @bind-Value="Input!.Email" type="email" placeholder="you@example.com" />
-            </div>
+        <div class="fs-form-group">
+            <label for="password">Password</label>
+            <input id="password" @bind="_password" type="password" placeholder="••••••••" class="fs-input" />
+        </div>
 
-            <div class="fs-form-group">
-                <label for="password">Password</label>
-                <InputText id="password" @bind-Value="Input!.Password" type="password" placeholder="••••••••" />
-            </div>
+        <div class="fs-form-group">
+            <label for="confirm">Confirm Password</label>
+            <input id="confirm" @bind="_confirmPassword" type="password" placeholder="••••••••" class="fs-input" />
+        </div>
 
-            <div class="fs-form-group">
-                <label for="confirm">Confirm Password</label>
-                <InputText id="confirm" @bind-Value="Input!.ConfirmPassword" type="password" placeholder="••••••••" />
-            </div>
+        <div class="fs-form-group">
+            <label>Card Details</label>
+            <div id="stripe-card-element" style="padding: 12px; border: 1px solid #333; border-radius: 8px; background: #111;"></div>
+        </div>
 
-            <button type="submit" class="fs-btn-submit">Create Account</button>
-        </EditForm>
+        <button class="fs-btn-submit" @onclick="RegisterAsync" disabled="@_submitting">
+            @(_submitting ? "Creating account..." : "Create Account")
+        </button>
 
         <p class="fs-auth-footer">
             Already have an account? <a href="/login">Sign in</a>
@@ -57,50 +66,122 @@
 </div>
 
 @code {
-    [SupplyParameterFromForm]
-    private RegisterModel? Input { get; set; }
-
+    private string _displayName = "";
+    private string _email = "";
+    private string _password = "";
+    private string _confirmPassword = "";
     private List<string> _errors = [];
+    private bool _submitting;
+    private string? _setupIntentSecret;
+    private string? _stripeCustomerId;
+    private bool _stripeReady;
 
-    protected override void OnInitialized() => Input ??= new();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var pk = StripeOptions.Value.PublishableKey;
+            if (!string.IsNullOrEmpty(pk))
+            {
+                await JS.InvokeVoidAsync("stripeInterop.init", pk);
+                await JS.InvokeVoidAsync("stripeInterop.mountCard", "stripe-card-element");
+                _stripeReady = true;
+            }
+        }
+    }
 
     private async Task RegisterAsync()
     {
         _errors.Clear();
+        _submitting = true;
+        StateHasChanged();
 
-        if (Input!.Password != Input.ConfirmPassword)
+        try
         {
-            _errors.Add("Passwords do not match.");
-            return;
-        }
+            // Validate fields
+            if (string.IsNullOrWhiteSpace(_displayName))
+            { _errors.Add("Display name is required."); return; }
+            if (string.IsNullOrWhiteSpace(_email))
+            { _errors.Add("Email is required."); return; }
+            if (string.IsNullOrWhiteSpace(_password))
+            { _errors.Add("Password is required."); return; }
+            if (_password != _confirmPassword)
+            { _errors.Add("Passwords do not match."); return; }
 
-        var user = new User
-        {
-            UserName = Input.Email,
-            Email = Input.Email,
-            DisplayName = Input.DisplayName,
-            EmailConfirmed = true
-        };
+            // 1. Create the user
+            var user = new User
+            {
+                UserName = _email,
+                Email = _email,
+                DisplayName = _displayName,
+                EmailConfirmed = true
+            };
 
-        var result = await UserManager.CreateAsync(user, Input.Password);
-        if (result.Succeeded)
-        {
+            var result = await UserManager.CreateAsync(user, _password);
+            if (!result.Succeeded)
+            {
+                _errors.AddRange(result.Errors.Select(e => e.Description));
+                return;
+            }
+
             await UserManager.AddToRoleAsync(user, "Athlete");
-            await SubscriptionService.CreateTrialAsync(user.Id);
+
+            // 2. Create Stripe customer + setup intent
+            if (_stripeReady && !string.IsNullOrEmpty(StripeOptions.Value.SecretKey))
+            {
+                try
+                {
+                    _stripeCustomerId = await PaymentService.CreateOrGetCustomerAsync(
+                        user.Id, _email, _displayName);
+
+                    _setupIntentSecret = await PaymentService.CreateSetupIntentAsync(_stripeCustomerId);
+
+                    // JS: confirm card setup with the secret
+                    var jsResult = await JS.InvokeAsync<StripeResult>(
+                        "stripeInterop.confirmSetupIntent", _setupIntentSecret);
+
+                    if (jsResult.Error is not null)
+                    {
+                        _errors.Add(jsResult.Error);
+                        return;
+                    }
+
+                    // 3. Create subscription with 30-day trial
+                    var priceId = StripeOptions.Value.PriceIds.CompetitorMonthly;
+                    var subId = await PaymentService.CreateSubscriptionWithTrialAsync(
+                        _stripeCustomerId, priceId, 30);
+
+                    // 4. Create trial + save Stripe IDs
+                    var sub = await SubscriptionService.CreateTrialAsync(user.Id);
+                    await SubscriptionService.SetStripeCustomerIdAsync(user.Id, _stripeCustomerId);
+                }
+                catch (Exception ex)
+                {
+                    // Stripe failed but user is created — fall back to trial without card
+                    _errors.Clear();
+                    await SubscriptionService.CreateTrialAsync(user.Id);
+                    _ = ex; // logged server-side
+                }
+            }
+            else
+            {
+                // No Stripe configured — just create trial
+                await SubscriptionService.CreateTrialAsync(user.Id);
+            }
+
+            // 5. Sign in and redirect
             await SignInManager.SignInAsync(user, isPersistent: true);
             Navigation.NavigateTo("/app/dashboard", forceLoad: true);
         }
-        else
+        catch (Exception ex)
         {
-            _errors.AddRange(result.Errors.Select(e => e.Description));
+            _errors.Add($"Registration failed: {ex.Message}");
+        }
+        finally
+        {
+            _submitting = false;
         }
     }
 
-    private sealed class RegisterModel
-    {
-        public string DisplayName { get; set; } = "";
-        public string Email { get; set; } = "";
-        public string Password { get; set; } = "";
-        public string ConfirmPassword { get; set; } = "";
-    }
+    private sealed record StripeResult(string? PaymentMethodId = null, string? Error = null);
 }

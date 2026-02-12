@@ -86,6 +86,32 @@ public class StripePaymentService : IPaymentService
         }, cancellationToken: ct);
     }
 
+    public async Task<string> CreateSetupIntentAsync(string stripeCustomerId, CancellationToken ct = default)
+    {
+        var service = new SetupIntentService();
+        var intent = await service.CreateAsync(new SetupIntentCreateOptions
+        {
+            Customer = stripeCustomerId,
+            PaymentMethodTypes = ["card"],
+        }, cancellationToken: ct);
+
+        return intent.ClientSecret;
+    }
+
+    public async Task<string> CreateSubscriptionWithTrialAsync(string stripeCustomerId, string priceId, int trialDays, CancellationToken ct = default)
+    {
+        var service = new SubscriptionService();
+        var sub = await service.CreateAsync(new SubscriptionCreateOptions
+        {
+            Customer = stripeCustomerId,
+            Items = [new SubscriptionItemOptions { Price = priceId }],
+            TrialPeriodDays = trialDays,
+            PaymentBehavior = "default_incomplete",
+        }, cancellationToken: ct);
+
+        return sub.Id;
+    }
+
     private string GetPriceId(SubscriptionTier tier, BillingInterval interval) => (tier, interval) switch
     {
         (SubscriptionTier.Athlete, BillingInterval.Monthly) => _priceIds.AthleteMonthly,
