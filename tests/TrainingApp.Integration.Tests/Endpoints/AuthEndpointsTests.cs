@@ -119,20 +119,14 @@ public class AuthEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task Me_Authenticated_ReturnsUserInfo()
     {
-        var email = UniqueEmail();
-        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register",
-            new RegisterRequest(email, "Test1234!", "Me User"));
-        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
-
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        var response = await _client.SendAsync(request);
+        // TestAuthHandler always authenticates as the seeded test user (test@example.com)
+        var response = await _client.GetAsync("/api/v1/auth/me");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<UserInfoResponse>();
         result.Should().NotBeNull();
-        result!.Email.Should().Be(email);
+        result!.Email.Should().Be("test@example.com");
+        result.DisplayName.Should().NotBeNullOrEmpty();
     }
 
     [Fact]

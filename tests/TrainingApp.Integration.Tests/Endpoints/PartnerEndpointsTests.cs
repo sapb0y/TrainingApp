@@ -16,6 +16,20 @@ public class PartnerEndpointsTests : IClassFixture<CustomWebApplicationFactory>
         _partnerClient = factory.CreatePartnerClient();
     }
 
+    /// <summary>End any active partnerships so tests are isolated.</summary>
+    private async Task CleanupActivePartnerships()
+    {
+        var listResp = await _client.GetAsync("/api/v1/partners");
+        if (!listResp.IsSuccessStatusCode) return;
+        var list = await listResp.Content.ReadFromJsonAsync<PartnershipListResponse>();
+        if (list?.Items is null) return;
+
+        foreach (var item in list.Items.Where(i => i.Status == "Active"))
+        {
+            await _client.PostAsync($"/api/v1/partners/{item.Id}/end", null);
+        }
+    }
+
     [Fact]
     public async Task CreateInvite_Returns200_WithCode()
     {
@@ -31,6 +45,8 @@ public class PartnerEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task AcceptInvite_ValidCode_ReturnsActivePartnership()
     {
+        await CleanupActivePartnerships();
+
         // User A creates invite
         var inviteResponse = await _client.PostAsync("/api/v1/partners/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CreateInviteResponse>();
@@ -74,6 +90,8 @@ public class PartnerEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetActivePartnership_AfterAccept_ReturnsPartnership()
     {
+        await CleanupActivePartnerships();
+
         var inviteResponse = await _client.PostAsync("/api/v1/partners/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CreateInviteResponse>();
 
@@ -91,6 +109,8 @@ public class PartnerEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task EndPartnership_Returns200_StatusEnded()
     {
+        await CleanupActivePartnerships();
+
         var inviteResponse = await _client.PostAsync("/api/v1/partners/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CreateInviteResponse>();
 

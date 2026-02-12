@@ -16,8 +16,24 @@ public class SharedSessionEndpointsTests : IClassFixture<CustomWebApplicationFac
         _partnerClient = factory.CreatePartnerClient();
     }
 
+    /// <summary>End any active partnerships so tests are isolated.</summary>
+    private async Task CleanupActivePartnerships()
+    {
+        var listResp = await _client.GetAsync("/api/v1/partners");
+        if (!listResp.IsSuccessStatusCode) return;
+        var list = await listResp.Content.ReadFromJsonAsync<PartnershipListResponse>();
+        if (list?.Items is null) return;
+
+        foreach (var item in list.Items.Where(i => i.Status == "Active"))
+        {
+            await _client.PostAsync($"/api/v1/partners/{item.Id}/end", null);
+        }
+    }
+
     private async Task<Guid> CreateActivePartnership()
     {
+        await CleanupActivePartnerships();
+
         var inviteResp = await _client.PostAsync("/api/v1/partners/invite", null);
         var invite = await inviteResp.Content.ReadFromJsonAsync<CreateInviteResponse>();
         await _partnerClient.PostAsJsonAsync("/api/v1/partners/accept",
@@ -102,13 +118,12 @@ public class SharedSessionEndpointsTests : IClassFixture<CustomWebApplicationFac
     [Fact]
     public async Task CreateSession_NonMember_ReturnsNotFound()
     {
-        // Create partnership between client and partner, then try with a different ID
         var partnershipId = await CreateActivePartnership();
 
-        // End the partnership first so we can create a fresh one
+        // End the partnership first
         await _client.PostAsync($"/api/v1/partners/{partnershipId}/end", null);
 
-        // Now create a new one and try to create session with old ended partnership
+        // Now try to create session with ended partnership
         var response = await _client.PostAsJsonAsync("/api/v1/shared-sessions",
             new CreateSharedSessionRequest(partnershipId, "2026-04-06", null, null, null));
 

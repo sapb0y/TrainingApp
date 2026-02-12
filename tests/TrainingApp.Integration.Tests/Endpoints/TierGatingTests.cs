@@ -17,7 +17,7 @@ public class TierGatingTests : IClassFixture<CustomWebApplicationFactory>
     {
         var client = _factory.CreateAthleteClient();
 
-        var response = await client.GetAsync("/api/v1/charts/strength-progress");
+        var response = await client.GetAsync("/api/v1/charts/strength");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -48,7 +48,7 @@ public class TierGatingTests : IClassFixture<CustomWebApplicationFactory>
         // Default test user has Coach tier (TestAuthHandler default)
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/v1/charts/strength-progress");
+        var response = await client.GetAsync("/api/v1/charts/strength");
 
         // May return 200 or other non-403 status (no data is fine)
         response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
