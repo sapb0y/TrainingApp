@@ -77,7 +77,12 @@
             {
                 <MudNavGroup Title="Coach" Icon="@Icons.Material.Filled.School">
                     <MudNavLink Href="/app/coach" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                    <MudNavLink Href="/app/coach-application" Icon="@Icons.Material.Filled.Info">Application</MudNavLink>
                 </MudNavGroup>
+            }
+            else
+            {
+                <MudNavLink Href="/app/coach-application" Icon="@Icons.Material.Filled.School">Become a Coach</MudNavLink>
             }
 
             <MudDivider Class="my-2" />

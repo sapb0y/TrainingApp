@@ -1,0 +1,205 @@
+@page "/app/coach/athlete/{AthleteId:guid}/notes"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject ICoachAthleteService CoachService
+@inject ICurrentUserService CurrentUser
+@inject TrainingAppDbContext Db
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Athlete Notes — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Coach">
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Error">No access to this athlete.</MudAlert>
+}
+else
+{
+    <PageHeader Title="@($"Notes for {_athleteName}")" Subtitle="Contextual coaching notes">
+        <Actions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       OnClick="GoBack">Back to Athlete</MudButton>
+            @if (_canAddNotes)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           Class="ml-2" OnClick="() => _showAdd = true">Add Note</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (!_notes.Any())
+    {
+        <EmptyState Message="No notes yet for this athlete" Icon="@Icons.Material.Filled.StickyNote2"
+                    ActionText="Add Note" OnAction="() => _showAdd = true" />
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var n in _notes)
+            {
+                <MudItem xs="12" sm="6">
+                    <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                        <MudCardContent>
+                            <div class="d-flex align-center justify-space-between mb-2">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @n.CreatedAt.LocalDateTime.ToString("MMM d, yyyy h:mm tt")
+                                </MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                               Color="Color.Error" OnClick="() => DeleteNote(n.Id)" />
+                            </div>
+                            <MudText Typo="Typo.body1">@n.Content</MudText>
+                            @if (n.WorkoutId.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                    Linked to workout @(n.WorkoutName ?? n.WorkoutId.Value.ToString()[..8])
+                                </MudText>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+
+</TierGate>
+
+@* ── Add Note Dialog ── *@
+<MudDialog @bind-Visible="_showAdd">
+    <TitleContent>Add Note</TitleContent>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_noteContent" Label="Note" Variant="Variant.Outlined"
+                      Lines="4" Class="mb-3" />
+
+        @if (_athleteWorkouts.Any())
+        {
+            <MudSelect T="Guid?" @bind-Value="_noteWorkoutId" Label="Link to Workout (optional)"
+                       Variant="Variant.Outlined" Clearable="true">
+                @foreach (var w in _athleteWorkouts)
+                {
+                    <MudSelectItem T="Guid?" Value="@w.Id">@w.Name — @w.ScheduledAt.LocalDateTime.ToString("MMM d")</MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showAdd = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddNote"
+                   Disabled="@(string.IsNullOrWhiteSpace(_noteContent))">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid AthleteId { get; set; }
+
+    private bool _loading = true;
+    private bool _hasAccess;
+    private bool _canAddNotes;
+    private string _athleteName = "";
+    private Guid? _coachAthleteId;
+    private List<NoteItem> _notes = [];
+    private List<Workout> _athleteWorkouts = [];
+
+    // Add form
+    private bool _showAdd;
+    private string _noteContent = "";
+    private Guid? _noteWorkoutId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsCoach) { _loading = false; return; }
+
+        try
+        {
+            await CoachService.ValidateCoachAccessAsync(CurrentUser.UserId, AthleteId, default);
+            _hasAccess = true;
+        }
+        catch { _loading = false; return; }
+
+        var rel = await CoachService.GetRelationshipAsync(CurrentUser.UserId, AthleteId, default);
+        _canAddNotes = rel?.Permissions.CanAddNotes ?? false;
+        _coachAthleteId = rel?.Id;
+
+        var athlete = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == AthleteId);
+        _athleteName = athlete?.DisplayName ?? "Unknown";
+
+        _athleteWorkouts = await Db.Workouts.AsNoTracking()
+            .Where(w => w.UserId == AthleteId)
+            .OrderByDescending(w => w.ScheduledAt)
+            .Take(20)
+            .ToListAsync();
+
+        await LoadNotes();
+        _loading = false;
+    }
+
+    private async Task LoadNotes()
+    {
+        var notes = await Db.CoachNotes.AsNoTracking()
+            .Where(n => n.AthleteId == AthleteId && n.CoachId == CurrentUser.UserId)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync();
+
+        var workoutIds = notes.Where(n => n.WorkoutId.HasValue).Select(n => n.WorkoutId!.Value).Distinct().ToList();
+        var workoutNames = await Db.Workouts.AsNoTracking()
+            .Where(w => workoutIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.Name);
+
+        _notes = notes.Select(n => new NoteItem(n.Id, n.Content, n.CreatedAt, n.WorkoutId,
+            n.WorkoutId.HasValue && workoutNames.TryGetValue(n.WorkoutId.Value, out var name) ? name : null)).ToList();
+    }
+
+    private async Task AddNote()
+    {
+        if (string.IsNullOrWhiteSpace(_noteContent) || _coachAthleteId is null) return;
+        try
+        {
+            var note = new CoachNote
+            {
+                Id = Guid.NewGuid(),
+                CoachAthleteId = _coachAthleteId.Value,
+                CoachId = CurrentUser.UserId,
+                AthleteId = AthleteId,
+                Content = _noteContent,
+                WorkoutId = _noteWorkoutId
+            };
+            Db.CoachNotes.Add(note);
+            await Db.SaveChangesAsync();
+            await LoadNotes();
+            _showAdd = false;
+            _noteContent = "";
+            _noteWorkoutId = null;
+            Snackbar.Add("Note added", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task DeleteNote(Guid noteId)
+    {
+        try
+        {
+            var note = await Db.CoachNotes.FirstOrDefaultAsync(n => n.Id == noteId && n.CoachId == CurrentUser.UserId);
+            if (note is null) return;
+            Db.CoachNotes.Remove(note);
+            await Db.SaveChangesAsync();
+            await LoadNotes();
+            Snackbar.Add("Note deleted", Severity.Info);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private void GoBack() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}");
+
+    private record NoteItem(Guid Id, string Content, DateTimeOffset CreatedAt, Guid? WorkoutId, string? WorkoutName);
+}

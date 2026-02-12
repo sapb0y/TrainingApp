@@ -1,0 +1,110 @@
+@page "/app/coach-application"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject ICoachApplicationService AppService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Coach Application — FitSpiralS</PageTitle>
+
+<PageHeader Title="Become a Coach" Subtitle="Apply to unlock the coaching platform" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (CurrentUser.IsCoach)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">You are already an approved coach!</MudAlert>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/app/coach">Go to Coach Dashboard</MudButton>
+}
+else if (_existing is not null)
+{
+    <MudPaper Elevation="0" Class="pa-6" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Application Status</MudText>
+        <div class="d-flex gap-4 align-center mb-4">
+            <MudChip T="string" Color="@StatusColor(_existing.Status)" Size="Size.Large">@_existing.Status</MudChip>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Submitted @_existing.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")</MudText>
+        </div>
+
+        <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+            <tbody>
+                <tr><td><b>Credentials</b></td><td>@_existing.Credentials</td></tr>
+                <tr><td><b>Current Clients</b></td><td>@_existing.CurrentClientCount</td></tr>
+                <tr><td><b>Business Goal</b></td><td>@_existing.BusinessGoal</td></tr>
+                @if (!string.IsNullOrEmpty(_existing.AdditionalInfo))
+                {
+                    <tr><td><b>Additional Info</b></td><td>@_existing.AdditionalInfo</td></tr>
+                }
+                @if (!string.IsNullOrEmpty(_existing.ReviewNotes))
+                {
+                    <tr><td><b>Review Notes</b></td><td>@_existing.ReviewNotes</td></tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Elevation="0" Class="pa-6" Style="border: 1px solid #1F1F2E; max-width: 600px;">
+        <MudText Typo="Typo.h6" Class="mb-4">Submit Your Application</MudText>
+
+        <MudTextField T="string" @bind-Value="_credentials" Label="Credentials / Certifications"
+                      Variant="Variant.Outlined" Lines="3" Class="mb-3"
+                      HelperText="e.g., CSCS, NASM-CPT, years of experience" />
+
+        <MudNumericField T="int" @bind-Value="_clientCount" Label="Current Client Count"
+                         Variant="Variant.Outlined" Min="0" Class="mb-3" />
+
+        <MudTextField T="string" @bind-Value="_businessGoal" Label="Business Goal"
+                      Variant="Variant.Outlined" Lines="2" Class="mb-3"
+                      HelperText="What do you want to achieve as a coach on FitSpiralS?" />
+
+        <MudTextField T="string" @bind-Value="_additionalInfo" Label="Additional Information (optional)"
+                      Variant="Variant.Outlined" Lines="2" Class="mb-4" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit"
+                   Disabled="@(!CanSubmit)">Submit Application</MudButton>
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private CoachApplication? _existing;
+
+    private string _credentials = "";
+    private int _clientCount;
+    private string _businessGoal = "";
+    private string? _additionalInfo;
+
+    private bool CanSubmit => !string.IsNullOrWhiteSpace(_credentials) && !string.IsNullOrWhiteSpace(_businessGoal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _existing = await AppService.GetApplicationAsync(CurrentUser.UserId);
+        _loading = false;
+    }
+
+    private async Task Submit()
+    {
+        if (!CanSubmit) return;
+        try
+        {
+            _existing = await AppService.SubmitApplicationAsync(
+                CurrentUser.UserId, _credentials, _clientCount, _businessGoal, _additionalInfo);
+            Snackbar.Add("Application submitted! We'll review it shortly.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private static Color StatusColor(CoachApplicationStatus s) => s switch
+    {
+        CoachApplicationStatus.Pending => Color.Warning,
+        CoachApplicationStatus.Approved => Color.Success,
+        CoachApplicationStatus.Rejected => Color.Error,
+        _ => Color.Default
+    };
+}
