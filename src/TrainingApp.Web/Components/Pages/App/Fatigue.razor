@@ -1,0 +1,258 @@
+@page "/app/fatigue"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IFatigueModelService FatigueService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Fatigue & Readiness — FitSpiralS</PageTitle>
+
+<PageHeader Title="Fatigue & Readiness" Subtitle="Monitor training load and recovery">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="() => _showRecovery = true">Log Recovery</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Readiness Summary ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent Class="pa-4 d-flex flex-column align-center">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">READINESS</MudText>
+                    @if (_readiness?.ReadinessScore.HasValue == true)
+                    {
+                        <MudProgressCircular Value="@((double)(_readiness.ReadinessScore.Value * 10))"
+                                             Size="Size.Large" Color="@ReadinessColor(_readiness.ReadinessScore.Value)"
+                                             Style="margin: 16px 0;" />
+                        <MudText Typo="Typo.h5" Color="@ReadinessColor(_readiness.ReadinessScore.Value)">
+                            @ReadinessLabel(_readiness.ReadinessScore.Value)
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Score: @_readiness.ReadinessScore.Value.ToString("N1") / 10
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-4">Not enough data</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="4">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <StatCard Label="FITNESS (CTL)" Value="@(_readiness?.Ctl.ToString("N1") ?? "—")"
+                              Icon="@Icons.Material.Filled.FitnessCenter"
+                              Subtitle="Chronic training load" />
+                </MudItem>
+                <MudItem xs="12">
+                    <StatCard Label="FATIGUE (ATL)" Value="@(_readiness?.Atl.ToString("N1") ?? "—")"
+                              Icon="@Icons.Material.Filled.Battery1Bar"
+                              Subtitle="Acute training load" />
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+        <MudItem xs="6" sm="4">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <StatCard Label="FORM (TSB)" Value="@(_readiness?.Tsb.ToString("N1") ?? "—")"
+                              Icon="@Icons.Material.Filled.ShowChart"
+                              Subtitle="@TsbInterpretation(_readiness?.Tsb)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <StatCard Label="TRIMP TODAY" Value="@(_readiness?.Trimp.ToString("N0") ?? "0")"
+                              Icon="@Icons.Material.Filled.Whatshot"
+                              Subtitle="Training impulse" />
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+    </MudGrid>
+
+    @* ── Fatigue History Chart ── *@
+    @if (_history.Count >= 2)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Training Load History</MudText>
+            <MudChart ChartType="ChartType.Line" ChartSeries="@_chartSeries"
+                      XAxisLabels="@_chartLabels" Width="100%" Height="300px"
+                      ChartOptions="_chartOptions" />
+        </MudPaper>
+    }
+
+    @* ── Recovery Logs ── *@
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Recovery Log</MudText>
+
+        @if (!_recoveryLogs.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No recovery entries. Log how you feel to improve readiness estimates.</MudText>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Sleep</th>
+                        <th>Energy</th>
+                        <th>Stress</th>
+                        <th>Muscle</th>
+                        <th>Mood</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _recoveryLogs.OrderByDescending(r => r.Date))
+                    {
+                        <tr>
+                            <td>@r.Date.ToString("MMM d")</td>
+                            <td>@(r.SleepQuality.HasValue ? $"{r.SleepQuality}/10" : "—") @(r.SleepHours.HasValue ? $"({r.SleepHours}h)" : "")</td>
+                            <td>@RatingDisplay(r.EnergyLevel)</td>
+                            <td>@RatingDisplay(r.StressLevel)</td>
+                            <td>@RatingDisplay(r.MuscleReadiness)</td>
+                            <td>@RatingDisplay(r.Mood)</td>
+                            <td>@(r.Notes ?? "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+}
+
+@* ── Recovery Log Dialog ── *@
+<MudDialog @bind-Visible="_showRecovery">
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_recSleepQuality" Label="Sleep Quality (1-10)"
+                                 Variant="Variant.Outlined" Min="1" Max="10" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="decimal?" @bind-Value="_recSleepHours" Label="Sleep Hours"
+                                 Variant="Variant.Outlined" Min="0m" Max="24m" Step="0.5m" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_recEnergy" Label="Energy (1-10)"
+                                 Variant="Variant.Outlined" Min="1" Max="10" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_recStress" Label="Stress (1-10)"
+                                 Variant="Variant.Outlined" Min="1" Max="10" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_recMuscle" Label="Muscle Readiness (1-10)"
+                                 Variant="Variant.Outlined" Min="1" Max="10" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_recMood" Label="Mood (1-10)"
+                                 Variant="Variant.Outlined" Min="1" Max="10" />
+            </MudItem>
+        </MudGrid>
+        <MudTextField T="string" @bind-Value="_recNotes" Label="Notes" Variant="Variant.Outlined" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showRecovery = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitRecovery">Log</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private DailyMetrics? _readiness;
+    private List<DailyMetrics> _history = [];
+    private List<RecoveryLog> _recoveryLogs = [];
+
+    // Recovery form
+    private bool _showRecovery;
+    private int? _recSleepQuality;
+    private decimal? _recSleepHours;
+    private int? _recStress;
+    private int? _recEnergy;
+    private int? _recMuscle;
+    private int? _recMood;
+    private string? _recNotes;
+
+    // Chart
+    private List<ChartSeries> _chartSeries = [];
+    private string[] _chartLabels = [];
+    private ChartOptions _chartOptions = new() { LineStrokeWidth = 2 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userId = CurrentUser.UserId;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = today.AddDays(-30);
+
+        _readiness = await FatigueService.GetReadinessAsync(userId);
+        _history = await FatigueService.GetHistoryAsync(userId, from, today);
+        _recoveryLogs = await FatigueService.GetRecoveryLogsAsync(userId, from, today);
+
+        BuildChart();
+        _loading = false;
+    }
+
+    private void BuildChart()
+    {
+        if (_history.Count < 2) return;
+        var ordered = _history.OrderBy(h => h.Date).ToList();
+        _chartLabels = ordered.Select(h => h.Date.ToString("M/d")).ToArray();
+        _chartSeries =
+        [
+            new ChartSeries { Name = "CTL", Data = ordered.Select(h => (double)h.Ctl).ToArray() },
+            new ChartSeries { Name = "ATL", Data = ordered.Select(h => (double)h.Atl).ToArray() },
+            new ChartSeries { Name = "TSB", Data = ordered.Select(h => (double)h.Tsb).ToArray() },
+        ];
+    }
+
+    private async Task SubmitRecovery()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await FatigueService.LogRecoveryAsync(CurrentUser.UserId, today,
+            _recSleepQuality, _recSleepHours, _recStress, _recEnergy, _recMuscle, _recMood, _recNotes);
+
+        _showRecovery = false;
+        _recoveryLogs = await FatigueService.GetRecoveryLogsAsync(CurrentUser.UserId, today.AddDays(-30), today);
+        _readiness = await FatigueService.GetReadinessAsync(CurrentUser.UserId);
+        Snackbar.Add("Recovery logged", Severity.Success);
+    }
+
+    private static Color ReadinessColor(decimal score) => score switch
+    {
+        >= 8 => Color.Success,
+        >= 6 => Color.Info,
+        >= 4 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private static string ReadinessLabel(decimal score) => score switch
+    {
+        >= 8 => "Excellent",
+        >= 6 => "Good",
+        >= 4 => "Moderate",
+        >= 3 => "Poor",
+        _ => "Very Poor"
+    };
+
+    private static string TsbInterpretation(decimal? tsb) => tsb switch
+    {
+        null => "",
+        > 15 => "Very fresh — consider pushing harder",
+        > 5 => "Fresh — good for quality sessions",
+        > -5 => "Neutral — maintain current load",
+        > -15 => "Fatigued — consider lighter work",
+        _ => "Very fatigued — recovery day recommended"
+    };
+
+    private static string RatingDisplay(int? val) => val.HasValue ? $"{val}/10" : "—";
+}

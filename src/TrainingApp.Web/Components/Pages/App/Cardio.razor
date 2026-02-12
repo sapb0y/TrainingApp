@@ -1,0 +1,231 @@
+@page "/app/cardio"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@attribute [Authorize]
+@inject ICardioTrackingService CardioService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Cardio — FitSpiralS</PageTitle>
+
+<PageHeader Title="Cardio" Subtitle="Track cardio sessions and monitor TRIMP">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenLog">Log Session</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Weekly Summary ── *@
+    @if (_weeklyStats is not null)
+    {
+        <MudGrid Spacing="3" Class="mb-4">
+            <MudItem xs="6" sm="3">
+                <StatCard Label="SESSIONS (7D)" Value="@_weeklyStats.TotalSessions.ToString()"
+                          Icon="@Icons.Material.Filled.DirectionsRun" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="DURATION (7D)" Value="@_weeklyStats.TotalMinutes.ToString()" Unit="min"
+                          Icon="@Icons.Material.Filled.Timer" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="DISTANCE (7D)" Value="@_weeklyStats.TotalDistanceKm.ToString("N1")" Unit="km"
+                          Icon="@Icons.Material.Filled.Straighten" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="TRIMP (7D)" Value="@_weeklyStats.TotalTrimp.ToString("N0")"
+                          Icon="@Icons.Material.Filled.Whatshot" />
+            </MudItem>
+        </MudGrid>
+    }
+
+    @* ── Zone Breakdown ── *@
+    @if (_weeklyStats is not null && _weeklyStats.MinutesByZone.Count > 0)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Zone Distribution (7 days)</MudText>
+            <MudGrid Spacing="2">
+                @foreach (var zone in _weeklyStats.MinutesByZone.OrderBy(z => z.Key))
+                {
+                    <MudItem xs="12">
+                        <div class="d-flex align-center gap-2">
+                            <MudText Typo="Typo.body2" Style="min-width:60px">@zone.Key</MudText>
+                            <MudProgressLinear Value="@ZonePercent(zone.Value)" Color="@ZoneColor(zone.Key)"
+                                               Size="Size.Large" Style="flex:1" />
+                            <MudText Typo="Typo.body2" Style="min-width:50px">@zone.Value min</MudText>
+                        </div>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @* ── History ── *@
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Recent Sessions</MudText>
+
+        @if (!_sessions.Any())
+        {
+            <EmptyState Message="No cardio sessions logged yet" Icon="@Icons.Material.Filled.DirectionsRun"
+                        ActionText="Log Session" OnAction="OpenLog" />
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Zone</th>
+                        <th>Duration</th>
+                        <th>Distance</th>
+                        <th>TRIMP</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in _sessions.OrderByDescending(s => s.Date))
+                    {
+                        <tr>
+                            <td>@s.Date.ToString("MMM d")</td>
+                            <td>@s.Modality</td>
+                            <td><MudChip T="string" Size="Size.Small" Color="@ZoneColor(s.Zone.ToString())">@s.Zone</MudChip></td>
+                            <td>@s.DurationMinutes min</td>
+                            <td>@(s.DistanceKm?.ToString("N1") ?? "—") km</td>
+                            <td>@(s.CardioTrimp?.ToString("N0") ?? "—")</td>
+                            <td>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                               Color="Color.Error" OnClick="() => Delete(s)" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+}
+
+@* ── Log Dialog ── *@
+<MudDialog @bind-Visible="_showLog">
+    <DialogContent>
+        <MudSelect T="CardioModality" @bind-Value="_logModality" Label="Type" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var m in Enum.GetValues<CardioModality>())
+            {
+                <MudSelectItem T="CardioModality" Value="m">@m</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="CardioIntensityZone" @bind-Value="_logZone" Label="Intensity Zone" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var z in Enum.GetValues<CardioIntensityZone>())
+            {
+                <MudSelectItem T="CardioIntensityZone" Value="z">@z</MudSelectItem>
+            }
+        </MudSelect>
+        <MudGrid Spacing="2" Class="mb-3">
+            <MudItem xs="6">
+                <MudNumericField T="int" @bind-Value="_logDuration" Label="Duration (min)" Variant="Variant.Outlined" Min="1" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="decimal?" @bind-Value="_logDistance" Label="Distance (km)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_logAvgHr" Label="Avg HR" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudNumericField T="int?" @bind-Value="_logMaxHr" Label="Max HR" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudDatePicker Label="Date" @bind-Date="_logDate" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_logNotes" Label="Notes" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showLog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitLog">Log</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private List<CardioSession> _sessions = [];
+    private InterferenceCalculatorService.WeeklyCardioStats? _weeklyStats;
+
+    // Log form
+    private bool _showLog;
+    private CardioModality _logModality = CardioModality.Running;
+    private CardioIntensityZone _logZone = CardioIntensityZone.Zone2;
+    private int _logDuration = 30;
+    private decimal? _logDistance;
+    private int? _logAvgHr;
+    private int? _logMaxHr;
+    private DateTime? _logDate = DateTime.Today;
+    private string? _logNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        _loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        _sessions = await CardioService.GetCardioHistoryAsync(CurrentUser.UserId, today.AddDays(-30), today);
+
+        var weekSessions = _sessions.Where(s => s.Date >= today.AddDays(-7));
+        _weeklyStats = InterferenceCalculatorService.CalculateWeeklySummary(
+            weekSessions.Select(s => (s.Modality, s.Zone, s.DurationMinutes, s.DistanceKm, s.CardioTrimp ?? 0)));
+    }
+
+    private void OpenLog()
+    {
+        _logModality = CardioModality.Running;
+        _logZone = CardioIntensityZone.Zone2;
+        _logDuration = 30;
+        _logDistance = null;
+        _logAvgHr = null;
+        _logMaxHr = null;
+        _logDate = DateTime.Today;
+        _logNotes = null;
+        _showLog = true;
+    }
+
+    private async Task SubmitLog()
+    {
+        var date = _logDate.HasValue ? DateOnly.FromDateTime(_logDate.Value) : DateOnly.FromDateTime(DateTime.Today);
+        await CardioService.LogCardioAsync(CurrentUser.UserId, date, _logModality, _logZone,
+            _logDuration, _logDistance, _logAvgHr, _logMaxHr, null, _logNotes);
+        _showLog = false;
+        await LoadData();
+        Snackbar.Add("Cardio session logged", Severity.Success);
+    }
+
+    private async Task Delete(CardioSession session)
+    {
+        await CardioService.DeleteCardioAsync(CurrentUser.UserId, session.Id);
+        await LoadData();
+        Snackbar.Add("Session deleted", Severity.Success);
+    }
+
+    private double ZonePercent(int minutes)
+    {
+        if (_weeklyStats is null || _weeklyStats.TotalMinutes == 0) return 0;
+        return (double)minutes / _weeklyStats.TotalMinutes * 100;
+    }
+
+    private static Color ZoneColor(string zone) => zone switch
+    {
+        "Zone1" => Color.Info,
+        "Zone2" => Color.Success,
+        "Zone3" => Color.Warning,
+        "Zone4" => Color.Error,
+        "Zone5" => Color.Error,
+        _ => Color.Default
+    };
+}
