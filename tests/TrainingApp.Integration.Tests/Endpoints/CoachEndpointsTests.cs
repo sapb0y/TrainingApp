@@ -16,6 +16,20 @@ public class CoachEndpointsTests : IClassFixture<CustomWebApplicationFactory>
         _coachClient = factory.CreateCoachClient();
     }
 
+    /// <summary>End any existing active coach relationship so tests are isolated.</summary>
+    private async Task CleanupActiveCoachRelationships()
+    {
+        var listResp = await _coachClient.GetAsync("/api/v1/coach/athletes");
+        if (!listResp.IsSuccessStatusCode) return;
+        var list = await listResp.Content.ReadFromJsonAsync<CoachAthleteListResponse>();
+        if (list?.Items is null) return;
+
+        foreach (var item in list.Items.Where(i => i.Status == "Active"))
+        {
+            await _coachClient.PostAsync($"/api/v1/coach/athletes/{item.AthleteId}/end", null);
+        }
+    }
+
     [Fact]
     public async Task CreateInvite_AsCoach_Returns200WithCode()
     {
@@ -31,6 +45,8 @@ public class CoachEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task AcceptInvite_ValidCode_ActivatesRelationship()
     {
+        await CleanupActiveCoachRelationships();
+
         var inviteResponse = await _coachClient.PostAsync("/api/v1/coach/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CoachInviteResponse>();
 
@@ -47,6 +63,8 @@ public class CoachEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task ListAthletes_AfterAccept_ReturnsRoster()
     {
+        await CleanupActiveCoachRelationships();
+
         var inviteResponse = await _coachClient.PostAsync("/api/v1/coach/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CoachInviteResponse>();
         await _athleteClient.PostAsJsonAsync("/api/v1/coach/accept",
@@ -64,6 +82,8 @@ public class CoachEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetAthlete_LinkedAthlete_ReturnsDetail()
     {
+        await CleanupActiveCoachRelationships();
+
         var inviteResponse = await _coachClient.PostAsync("/api/v1/coach/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CoachInviteResponse>();
         var acceptResponse = await _athleteClient.PostAsJsonAsync("/api/v1/coach/accept",
@@ -81,6 +101,8 @@ public class CoachEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task EndRelationship_ActiveRelationship_ReturnsEnded()
     {
+        await CleanupActiveCoachRelationships();
+
         var inviteResponse = await _coachClient.PostAsync("/api/v1/coach/invite", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync<CoachInviteResponse>();
         var acceptResponse = await _athleteClient.PostAsJsonAsync("/api/v1/coach/accept",
@@ -111,6 +133,8 @@ public class CoachEndpointsTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task AcceptInvite_WhenAthleteHasCoach_ReturnsConflict()
     {
+        await CleanupActiveCoachRelationships();
+
         // First coach-athlete link
         var invite1 = await _coachClient.PostAsync("/api/v1/coach/invite", null);
         var code1 = await invite1.Content.ReadFromJsonAsync<CoachInviteResponse>();
