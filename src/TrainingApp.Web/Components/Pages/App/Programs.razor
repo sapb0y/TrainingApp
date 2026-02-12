@@ -6,7 +6,8 @@
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject IProgramGeneratorService ProgramGen
 @inject ICurrentUserService CurrentUser
 @inject NavigationManager Nav
@@ -97,6 +98,7 @@ else
 </MudDialog>
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private List<ProgramEntity> _programs = [];
 
@@ -113,6 +115,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         _programs = await Db.Programs.AsNoTracking()
             .Include(p => p.Phases)
             .Where(p => p.UserId == CurrentUser.UserId)
@@ -152,4 +155,6 @@ else
         ProgramStatus.Archived => Color.Default,
         _ => Color.Default
     };
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

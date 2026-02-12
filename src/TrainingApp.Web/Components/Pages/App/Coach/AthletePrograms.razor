@@ -10,8 +10,9 @@
 @inject ICoachAthleteService CoachService
 @inject IProgramGeneratorService Generator
 @inject ICurrentUserService CurrentUser
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject NavigationManager Nav
+@implements IAsyncDisposable
 @inject ISnackbar Snackbar
 
 <PageTitle>Athlete Programs — FitSpiralS</PageTitle>
@@ -275,6 +276,8 @@ else
 </MudDialog>
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     [Parameter] public Guid AthleteId { get; set; }
 
     private bool _loading = true;
@@ -317,6 +320,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         if (!CurrentUser.IsCoach) { _loading = false; return; }
 
         try
@@ -576,4 +580,6 @@ else
     private record ProgramSummary(Guid Id, string Name, string Goal, string Template, string Status, int DurationWeeks, DateTimeOffset CreatedAt);
     private record AthleteOption(Guid AthleteId, string AthleteName);
     private record WorkoutOption(Guid Id, string Name, int DayNumber);
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

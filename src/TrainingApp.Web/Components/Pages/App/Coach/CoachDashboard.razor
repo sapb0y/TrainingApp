@@ -10,8 +10,9 @@
 @inject ICoachAthleteService CoachService
 @inject ICoachAlertAggregatorService AlertService
 @inject ICurrentUserService CurrentUser
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject NavigationManager Nav
+@implements IAsyncDisposable
 @inject ISnackbar Snackbar
 
 <PageTitle>Coach Dashboard — FitSpiralS</PageTitle>
@@ -180,6 +181,8 @@ else
 </TierGate>
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     private bool _loading = true;
     private List<RosterItem> _roster = [];
     private List<CoachAlertEngine.CoachAlert> _alerts = [];
@@ -189,6 +192,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         if (!CurrentUser.IsCoach) { _loading = false; return; }
 
         var coachId = CurrentUser.UserId;
@@ -356,4 +360,6 @@ else
 
     private record RosterItem(Guid AthleteId, string Name, decimal? Tsb, string? Readiness,
         int AlertCount, int UnreviewedCount, DateTime? LastWorkout, string Trend, string Risk);
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

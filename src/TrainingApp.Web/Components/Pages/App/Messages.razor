@@ -6,8 +6,9 @@
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
+@implements IAsyncDisposable
 @inject ICurrentUserService CurrentUser
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 
@@ -62,6 +63,7 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private CoachAthlete? _coachRelationship;
     private string _coachName = "";
@@ -72,6 +74,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         _coachRelationship = await Db.CoachAthletes.AsNoTracking()
             .Include(ca => ca.Coach)
             .Where(ca => ca.AthleteId == CurrentUser.UserId && ca.Status == CoachAthleteStatus.Active)
@@ -138,4 +141,6 @@ else
         if (e.Key == "Enter" && !e.ShiftKey)
             await SendMessage();
     }
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

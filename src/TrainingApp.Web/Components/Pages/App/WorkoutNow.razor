@@ -8,8 +8,9 @@
 @attribute [Authorize]
 @inject ISmartWorkoutService SmartService
 @inject ICurrentUserService CurrentUser
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject NavigationManager Nav
+@implements IAsyncDisposable
 @inject ISnackbar Snackbar
 
 <PageTitle>Workout Now — FitSpiralS</PageTitle>
@@ -92,13 +93,19 @@ else if (_options.Count > 0)
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     private int _duration = 45;
     private bool _generating;
     private bool _hasGenerated;
     private bool _starting;
     private List<WorkoutOption> _options = [];
 
-    protected override async Task OnInitializedAsync() => await GenerateOptions();
+    protected override async Task OnInitializedAsync()
+    {
+        Db = await DbFactory.CreateDbContextAsync();
+        await GenerateOptions();
+    }
 
     private async Task OnDurationChanged(int value)
     {
@@ -202,4 +209,6 @@ else if (_options.Count > 0)
         WorkoutType.Deload => Color.Success,
         _ => Color.Default
     };
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

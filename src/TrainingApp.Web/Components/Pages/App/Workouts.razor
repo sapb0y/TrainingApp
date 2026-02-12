@@ -6,7 +6,8 @@
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
 @inject NavigationManager Nav
 @inject IDialogService DialogService
@@ -115,6 +116,7 @@ else
 </MudDialog>
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private List<Workout> _workouts = [];
     private WorkoutStatus? _statusFilter;
@@ -127,7 +129,11 @@ else
     private string _newName = "";
     private DateTime? _newDate = DateTime.Today;
 
-    protected override async Task OnInitializedAsync() => await LoadWorkouts();
+    protected override async Task OnInitializedAsync()
+    {
+        Db = await DbFactory.CreateDbContextAsync();
+        await LoadWorkouts();
+    }
 
     private async Task LoadWorkouts()
     {
@@ -243,4 +249,6 @@ else
         var d = end.Value - start.Value;
         return d.TotalHours >= 1 ? $"{d.Hours}h {d.Minutes}m" : $"{d.Minutes}m";
     }
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

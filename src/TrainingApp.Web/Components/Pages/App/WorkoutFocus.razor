@@ -5,12 +5,13 @@
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @implements IDisposable
+@implements IAsyncDisposable
 
 <PageTitle>Focus Mode — FitSpiralS</PageTitle>
 
@@ -166,6 +167,7 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
     [Parameter] public Guid WorkoutId { get; set; }
 
     private bool _loading = true;
@@ -197,6 +199,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         _workout = await Db.Workouts
             .Include(w => w.Sets).ThenInclude(s => s.Exercise)
             .FirstOrDefaultAsync(w => w.Id == WorkoutId && w.UserId == CurrentUser.UserId);
@@ -409,6 +412,12 @@ else
     {
         _dotNetRef?.Dispose();
         _ = JS.InvokeVoidAsync("timerInterop.stop");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        await Db.DisposeAsync();
     }
 
     private sealed record ExerciseGroup(Guid ExerciseId, string ExerciseName, List<WorkoutSet> Sets);

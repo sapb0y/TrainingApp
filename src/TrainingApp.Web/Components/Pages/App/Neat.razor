@@ -7,7 +7,8 @@
 @using TrainingApp.Core.Services
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
 @inject ISnackbar Snackbar
 
@@ -108,6 +109,7 @@ else
 </MudDialog>
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private List<NeatLog> _logs = [];
     private NeatLog? _todayLog;
@@ -125,6 +127,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         await LoadData();
         _loading = false;
     }
@@ -176,4 +179,6 @@ else
         await LoadData();
         Snackbar.Add("Steps logged", Severity.Success);
     }
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

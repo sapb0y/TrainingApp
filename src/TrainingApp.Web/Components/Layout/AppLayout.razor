@@ -6,7 +6,8 @@
 @using TrainingApp.Core.Entities
 @using Microsoft.EntityFrameworkCore
 @using TrainingApp.Infrastructure.Data
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
+@implements IAsyncDisposable
 
 <MudThemeProvider Theme="AppTheme.Default" IsDarkMode="true" />
 <MudPopoverProvider />
@@ -123,12 +124,15 @@
 </MudLayout>
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     private bool _drawerOpen = true;
     private bool _noSubscription;
     private int _unreadMessages;
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         try
         {
             var sub = await SubService.GetSubscriptionAsync(CurrentUser.UserId);
@@ -148,4 +152,6 @@
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

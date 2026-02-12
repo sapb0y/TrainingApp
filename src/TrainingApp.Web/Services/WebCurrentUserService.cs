@@ -1,16 +1,21 @@
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 using TrainingApp.Core.Entities;
 using TrainingApp.Core.Interfaces;
+using TrainingApp.Infrastructure.Data;
 
 namespace TrainingApp.Web.Services;
 
 public class WebCurrentUserService : ICurrentUserService
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IDbContextFactory<TrainingAppDbContext> _dbFactory;
+    private SubscriptionTier? _cachedTier;
 
-    public WebCurrentUserService(IHttpContextAccessor httpContextAccessor)
+    public WebCurrentUserService(IHttpContextAccessor httpContextAccessor, IDbContextFactory<TrainingAppDbContext> dbFactory)
     {
         _httpContextAccessor = httpContextAccessor;
+        _dbFactory = dbFactory;
     }
 
     public Guid UserId
@@ -40,13 +45,18 @@ public class WebCurrentUserService : ICurrentUserService
     {
         get
         {
-            var tierClaim = _httpContextAccessor.HttpContext?.User
-                .FindFirst("subscription_tier")?.Value;
+            if (_cachedTier.HasValue) return _cachedTier.Value;
 
-            if (Enum.TryParse<SubscriptionTier>(tierClaim, true, out var tier))
-                return tier;
+            if (!IsAuthenticated) return SubscriptionTier.Athlete;
 
-            return SubscriptionTier.Athlete;
+            using var db = _dbFactory.CreateDbContext();
+            var sub = db.UserSubscriptions.AsNoTracking()
+                .Where(s => s.UserId == UserId)
+                .Select(s => s.Tier)
+                .FirstOrDefault();
+
+            _cachedTier = sub == default ? SubscriptionTier.Athlete : sub;
+            return _cachedTier.Value;
         }
     }
 }

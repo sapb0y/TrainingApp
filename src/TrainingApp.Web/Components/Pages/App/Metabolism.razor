@@ -7,7 +7,8 @@
 @using TrainingApp.Core.Services
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
 @inject IWeightTrackingService WeightService
 @inject IDeficitPhaseService DeficitService
@@ -103,6 +104,7 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private User? _user;
     private MetabolicCalculatorService.BmrResult? _bmr;
@@ -117,6 +119,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         _user = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == CurrentUser.UserId);
         if (_user?.Settings.Sex is null || _user.Settings.HeightCm is null || _user.Settings.DateOfBirth is null)
         {
@@ -172,4 +175,6 @@ else
     }
 
     private sealed record AlertItem(string Message, Severity Severity);
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

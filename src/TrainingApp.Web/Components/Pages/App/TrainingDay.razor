@@ -7,7 +7,8 @@
 @using TrainingApp.Core.Services
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICardioTrackingService CardioService
 @inject IFatigueModelService FatigueService
 @inject ICurrentUserService CurrentUser
@@ -133,6 +134,7 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private DateOnly _date = DateOnly.FromDateTime(DateTime.UtcNow);
     private bool _loading = true;
 
@@ -145,7 +147,11 @@ else
     private int _totalSets;
     private decimal _totalVolume;
 
-    protected override async Task OnInitializedAsync() => await LoadDay();
+    protected override async Task OnInitializedAsync()
+    {
+        Db = await DbFactory.CreateDbContextAsync();
+        await LoadDay();
+    }
 
     private async Task LoadDay()
     {
@@ -229,4 +235,6 @@ else
         WorkoutStatus.Completed => Color.Success,
         _ => Color.Default
     };
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

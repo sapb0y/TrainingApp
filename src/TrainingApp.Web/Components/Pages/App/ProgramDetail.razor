@@ -7,8 +7,9 @@
 @using TrainingApp.Infrastructure.Data
 @using ProgramEntity = TrainingApp.Core.Entities.Program
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
+@implements IAsyncDisposable
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 
@@ -112,6 +113,8 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     [Parameter] public Guid ProgramId { get; set; }
 
     private bool _loading = true;
@@ -119,6 +122,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         _program = await Db.Programs.AsNoTracking()
             .Include(p => p.Phases).ThenInclude(ph => ph.Workouts).ThenInclude(w => w.Exercises).ThenInclude(e => e.Exercise)
             .FirstOrDefaultAsync(p => p.Id == ProgramId && p.UserId == CurrentUser.UserId);
@@ -172,4 +176,6 @@ else
         PhaseType.Deload => Color.Success,
         _ => Color.Default
     };
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

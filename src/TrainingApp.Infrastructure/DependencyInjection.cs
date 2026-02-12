@@ -32,6 +32,8 @@ public static class DependencyInjection
         dataSourceBuilder.EnableDynamicJson();
         var dataSource = dataSourceBuilder.Build();
 
+        services.AddDbContextFactory<TrainingAppDbContext>(options =>
+            options.UseNpgsql(dataSource));
         services.AddDbContext<TrainingAppDbContext>(options =>
             options.UseNpgsql(dataSource));
 

@@ -1,8 +1,11 @@
 @page "/app/subscription"
 @layout AppLayout
 @rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
 @using TrainingApp.Core.Entities
 @using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@implements IAsyncDisposable
 @attribute [Authorize]
 @inject ISubscriptionService SubService
 @inject IPaymentService PaymentService
@@ -127,19 +130,22 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     private bool _loading = true;
     private UserSubscription? _sub;
     private int? _trialDays;
 
     private static readonly List<TierInfo> _tiers =
     [
-        new(SubscriptionTier.Athlete, "$9/mo", ["Workout tracking", "Weight & cardio logging", "Fatigue monitoring", "Deficit management"]),
-        new(SubscriptionTier.Competitor, "$19/mo", ["Everything in Athlete", "Program generation", "Charts & analytics", "Goals & insights", "Training partners"]),
-        new(SubscriptionTier.Coach, "$39/mo", ["Everything in Competitor", "Athlete management", "Alert dashboard", "Program gen for athletes"]),
+        new(SubscriptionTier.Athlete, "$19/mo", ["Workout tracking", "Weight & cardio logging", "Fatigue monitoring", "Deficit management"]),
+        new(SubscriptionTier.Competitor, "$44/mo", ["Everything in Athlete", "Program generation", "Charts & analytics", "Goals & insights", "Training partners"]),
+        new(SubscriptionTier.Coach, "$99/mo", ["Everything in Competitor", "Athlete management", "Alert dashboard", "Program gen for athletes"]),
     ];
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         _sub = await SubService.GetSubscriptionAsync(CurrentUser.UserId);
         if (_sub is not null) _trialDays = SubService.GetTrialDaysRemaining(_sub);
         _loading = false;
@@ -198,7 +204,7 @@ else
         }
     }
 
-    [Inject] private TrainingApp.Infrastructure.Data.TrainingAppDbContext Db { get; set; } = default!;
+    [Inject] private IDbContextFactory<TrainingAppDbContext> DbFactory { get; set; } = default!;
 
     private static Color StatusColor(SubscriptionStatus s) => s switch
     {
@@ -211,4 +217,6 @@ else
     };
 
     private sealed record TierInfo(SubscriptionTier Tier, string Price, List<string> Features);
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

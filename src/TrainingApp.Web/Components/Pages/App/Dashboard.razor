@@ -7,7 +7,8 @@
 @using TrainingApp.Core.Services
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
 @inject IFatigueModelService FatigueService
 
@@ -185,6 +186,7 @@ else
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private ChartDataService.DashboardSummary? _summary;
     private int _activeDays;
@@ -192,6 +194,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         if (!CurrentUser.IsAuthenticated) return;
 
         var userId = CurrentUser.UserId;
@@ -330,4 +333,6 @@ else
     [Inject] private NavigationManager Nav { get; set; } = default!;
 
     private sealed record PRInfo(string ExerciseName, decimal BestE1rm, DateOnly Date);
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

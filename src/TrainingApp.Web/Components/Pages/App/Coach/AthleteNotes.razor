@@ -8,8 +8,9 @@
 @attribute [Authorize]
 @inject ICoachAthleteService CoachService
 @inject ICurrentUserService CurrentUser
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject NavigationManager Nav
+@implements IAsyncDisposable
 @inject ISnackbar Snackbar
 
 <PageTitle>Athlete Notes — FitSpiralS</PageTitle>
@@ -101,6 +102,8 @@ else
 </MudDialog>
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     [Parameter] public Guid AthleteId { get; set; }
 
     private bool _loading = true;
@@ -118,6 +121,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         if (!CurrentUser.IsCoach) { _loading = false; return; }
 
         try
@@ -202,4 +206,6 @@ else
     private void GoBack() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}");
 
     private record NoteItem(Guid Id, string Content, DateTimeOffset CreatedAt, Guid? WorkoutId, string? WorkoutName);
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

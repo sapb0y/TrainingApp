@@ -6,7 +6,8 @@
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@implements IAsyncDisposable
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
 @inject ISnackbar Snackbar
 
@@ -148,6 +149,7 @@ else if (_settings is not null)
 }
 
 @code {
+    private TrainingAppDbContext Db = default!;
     private bool _loading = true;
     private bool _saving;
     private UserSettings? _settings;
@@ -155,6 +157,7 @@ else if (_settings is not null)
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         var user = await Db.Users.FirstOrDefaultAsync(u => u.Id == CurrentUser.UserId);
         if (user is not null)
         {
@@ -208,4 +211,6 @@ else if (_settings is not null)
 
         _saving = false;
     }
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }

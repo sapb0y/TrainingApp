@@ -7,8 +7,9 @@
 @using TrainingApp.Core.Services
 @using TrainingApp.Infrastructure.Data
 @attribute [Authorize]
-@inject TrainingAppDbContext Db
+@inject IDbContextFactory<TrainingAppDbContext> DbFactory
 @inject ICurrentUserService CurrentUser
+@implements IAsyncDisposable
 @inject IFatigueModelService FatigueService
 
 <PageTitle>Charts — FitSpiralS</PageTitle>
@@ -71,6 +72,8 @@ else
 </TierGate>
 
 @code {
+    private TrainingAppDbContext Db = default!;
+
     private bool _loading = true;
     private string _activeChart = "strength";
     private string _chartTitle = "Strength Progression";
@@ -83,6 +86,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Db = await DbFactory.CreateDbContextAsync();
         await LoadChart();
         _loading = false;
     }
@@ -209,4 +213,6 @@ else
         _chartLabels = chart.Series[0].Points.Select(p => p.Date.ToString("M/d")).ToArray();
         _chartSeries = chart.Series.Select(s => new ChartSeries { Name = s.Name, Data = s.Points.Select(p => (double)p.Value).ToArray() }).ToList();
     }
+
+    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
 }
