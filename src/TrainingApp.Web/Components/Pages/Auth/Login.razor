@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Identity
 @using TrainingApp.Core.Entities
 @inject SignInManager<User> SignInManager
+@inject UserManager<User> UserManager
 @inject NavigationManager Navigation
 
 <PageTitle>Login — FitSpiralS</PageTitle>
@@ -53,7 +54,10 @@
 
         if (result.Succeeded)
         {
-            Navigation.NavigateTo("/admin", forceLoad: true);
+            var user = await UserManager.FindByEmailAsync(Input!.Email);
+            var isAdmin = user is not null && await UserManager.IsInRoleAsync(user, "Admin");
+            var redirectUrl = isAdmin ? "/admin" : "/dashboard";
+            Navigation.NavigateTo(redirectUrl, forceLoad: true);
         }
         else
         {

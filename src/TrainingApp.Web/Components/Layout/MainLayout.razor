@@ -16,7 +16,14 @@
         <a href="/pricing">Pricing</a>
         <AuthorizeView>
             <Authorized>
-                <a href="/admin">Dashboard</a>
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <a href="/admin">Dashboard</a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/dashboard">Dashboard</a>
+                    </NotAuthorized>
+                </AuthorizeView>
                 <a href="/logout">Logout</a>
             </Authorized>
             <NotAuthorized>
