@@ -65,6 +65,13 @@ else
         }
     </MudPaper>
 
+    @if (!string.IsNullOrEmpty(_workout.CoachFeedback))
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.School" Dense="true">
+            <b>Coach Feedback:</b> @_workout.CoachFeedback
+        </MudAlert>
+    }
+
     @* ── Recommendations ── *@
     @if (_recommendations is not null && _recommendations.Exercises.Count > 0)
     {

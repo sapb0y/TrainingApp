@@ -51,7 +51,8 @@ else
             @foreach (var p in _programs)
             {
                 <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                    <MudCard Elevation="0" Style="@($"border: 1px solid {(_selectedProgramId == p.Id ? "#7C3AED" : "#1F1F2E")}; cursor: pointer;")"
+                             @onclick="() => SelectProgram(p.Id)">
                         <MudCardContent>
                             <MudText Typo="Typo.h6">@p.Name</MudText>
                             <div class="d-flex gap-2 mt-1 mb-2">
@@ -66,6 +67,90 @@ else
                 </MudItem>
             }
         </MudGrid>
+    }
+
+    @* ── Program Detail Editor ── *@
+    @if (_selectedProgram is not null)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mt-4" Style="border: 1px solid #1F1F2E;">
+            <div class="d-flex align-center justify-space-between mb-3">
+                <MudText Typo="Typo.h6">@_selectedProgram.Name — Workouts</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="() => _selectedProgramId = null"
+                           StartIcon="@Icons.Material.Filled.Close" Size="Size.Small">Close</MudButton>
+            </div>
+
+            @foreach (var phase in _selectedProgram.Phases.OrderBy(p => p.OrderIndex))
+            {
+                <MudText Typo="Typo.subtitle1" Class="mb-1 mt-2"><b>@phase.Name</b></MudText>
+                @foreach (var workout in phase.Workouts.OrderBy(w => w.OrderIndex))
+                {
+                    <MudExpansionPanels Class="mb-2">
+                        <MudExpansionPanel Text="@($"{workout.Name} (Day {workout.DayNumber})")">
+                            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                                <thead><tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>RPE</th><th>Rest</th>
+                                    @if (_canModify) { <th></th> }
+                                </tr></thead>
+                                <tbody>
+                                    @foreach (var ex in workout.Exercises.OrderBy(e => e.OrderIndex))
+                                    {
+                                        <tr>
+                                            <td>@(ex.Exercise?.Name ?? "Unknown")</td>
+                                            <td>
+                                                @if (_editingExerciseId == ex.Id)
+                                                {
+                                                    <MudNumericField T="int" Value="ex.TargetSets" ValueChanged="v => ex.TargetSets = v"
+                                                                     Variant="Variant.Text" Margin="Margin.Dense" Style="width:60px;" />
+                                                }
+                                                else { @ex.TargetSets }
+                                            </td>
+                                            <td>
+                                                @if (_editingExerciseId == ex.Id)
+                                                {
+                                                    <span class="d-flex align-center gap-1">
+                                                        <MudNumericField T="int" Value="ex.TargetRepsMin" ValueChanged="v => ex.TargetRepsMin = v"
+                                                                         Variant="Variant.Text" Margin="Margin.Dense" Style="width:50px;" />
+                                                        -
+                                                        <MudNumericField T="int" Value="ex.TargetRepsMax" ValueChanged="v => ex.TargetRepsMax = v"
+                                                                         Variant="Variant.Text" Margin="Margin.Dense" Style="width:50px;" />
+                                                    </span>
+                                                }
+                                                else { @($"{ex.TargetRepsMin}-{ex.TargetRepsMax}") }
+                                            </td>
+                                            <td>
+                                                @if (_editingExerciseId == ex.Id)
+                                                {
+                                                    <MudNumericField T="decimal?" Value="ex.TargetRpe" ValueChanged="v => ex.TargetRpe = v"
+                                                                     Variant="Variant.Text" Margin="Margin.Dense" Style="width:60px;" />
+                                                }
+                                                else { @(ex.TargetRpe?.ToString("N1") ?? "—") }
+                                            </td>
+                                            <td>@(ex.RestSeconds)s</td>
+                                            @if (_canModify)
+                                            {
+                                                <td>
+                                                    @if (_editingExerciseId == ex.Id)
+                                                    {
+                                                        <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text"
+                                                                   OnClick="() => SaveExercise(ex)">Save</MudButton>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                                                                   OnClick="() => _editingExerciseId = ex.Id">Edit</MudButton>
+                                                    }
+                                                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text"
+                                                               OnClick="() => RemoveExercise(ex)">Remove</MudButton>
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                }
+            }
+        </MudPaper>
     }
 }
 
@@ -106,6 +191,11 @@ else
     private bool _canModify;
     private string _athleteName = "";
     private List<ProgramSummary> _programs = [];
+
+    // Program detail
+    private Guid? _selectedProgramId;
+    private ProgramEntity? _selectedProgram;
+    private Guid? _editingExerciseId;
 
     // Generate form
     private bool _showGenerate;
@@ -160,6 +250,57 @@ else
             Snackbar.Add("Program generated!", Severity.Success);
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task SelectProgram(Guid programId)
+    {
+        if (_selectedProgramId == programId) { _selectedProgramId = null; _selectedProgram = null; return; }
+
+        _selectedProgramId = programId;
+        _selectedProgram = await Db.Programs
+            .Include(p => p.Phases)
+                .ThenInclude(ph => ph.Workouts)
+                    .ThenInclude(w => w.Exercises)
+                        .ThenInclude(e => e.Exercise)
+            .FirstOrDefaultAsync(p => p.Id == programId);
+        _editingExerciseId = null;
+    }
+
+    private async Task SaveExercise(ProgramExercise ex)
+    {
+        try
+        {
+            var tracked = await Db.ProgramExercises.FindAsync(ex.Id);
+            if (tracked is not null)
+            {
+                tracked.TargetSets = ex.TargetSets;
+                tracked.TargetRepsMin = ex.TargetRepsMin;
+                tracked.TargetRepsMax = ex.TargetRepsMax;
+                tracked.TargetRpe = ex.TargetRpe;
+                await Db.SaveChangesAsync();
+                Snackbar.Add("Saved", Severity.Success);
+            }
+            _editingExerciseId = null;
+        }
+        catch (Exception ex2) { Snackbar.Add(ex2.Message, Severity.Error); }
+    }
+
+    private async Task RemoveExercise(ProgramExercise ex)
+    {
+        try
+        {
+            var tracked = await Db.ProgramExercises.FindAsync(ex.Id);
+            if (tracked is not null)
+            {
+                Db.ProgramExercises.Remove(tracked);
+                await Db.SaveChangesAsync();
+                // Refresh
+                if (_selectedProgramId.HasValue)
+                    await SelectProgram(_selectedProgramId.Value);
+                Snackbar.Add("Exercise removed", Severity.Success);
+            }
+        }
+        catch (Exception ex2) { Snackbar.Add(ex2.Message, Severity.Error); }
     }
 
     private void GoBack() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}");

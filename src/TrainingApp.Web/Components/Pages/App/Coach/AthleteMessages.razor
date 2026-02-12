@@ -1,0 +1,149 @@
+@page "/app/coach/athlete/{AthleteId:guid}/messages"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject ICoachAthleteService CoachService
+@inject ICurrentUserService CurrentUser
+@inject TrainingAppDbContext Db
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Messages — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Coach">
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Error">No access to this athlete.</MudAlert>
+}
+else
+{
+    <PageHeader Title="@($"Messages with {_athleteName}")" Subtitle="Coach-athlete messaging">
+        <Actions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       Href="@($"/app/coach/athlete/{AthleteId}")">Back to Athlete</MudButton>
+        </Actions>
+    </PageHeader>
+
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E; max-height: 500px; overflow-y: auto;" @ref="_messageContainer">
+        @if (!_messages.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">No messages yet. Start the conversation!</MudText>
+        }
+        else
+        {
+            @foreach (var msg in _messages)
+            {
+                var isMe = msg.SenderId == CurrentUser.UserId;
+                <div class="d-flex @(isMe ? "justify-end" : "justify-start") mb-2">
+                    <MudPaper Elevation="0" Class="pa-3" Style="@($"max-width:70%;border-radius:12px;background:{(isMe ? "#2D1B69" : "#1F1F2E")};")">
+                        <MudText Typo="Typo.body2">@msg.Content</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="@(isMe ? Align.Right : Align.Left)">
+                            @msg.CreatedAt.LocalDateTime.ToString("MMM d, h:mm tt")
+                        </MudText>
+                    </MudPaper>
+                </div>
+            }
+        }
+    </MudPaper>
+
+    <div class="d-flex gap-2 mt-3">
+        <MudTextField T="string" @bind-Value="_newMessage" Label="Type a message..." Variant="Variant.Outlined"
+                      Immediate="true" OnKeyDown="OnKeyDown" Style="flex: 1;" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SendMessage"
+                   Disabled="@(string.IsNullOrWhiteSpace(_newMessage) || _sending)"
+                   StartIcon="@Icons.Material.Filled.Send">Send</MudButton>
+    </div>
+}
+
+</TierGate>
+
+@code {
+    [Parameter] public Guid AthleteId { get; set; }
+
+    private bool _loading = true;
+    private bool _hasAccess;
+    private string _athleteName = "";
+    private Guid _coachAthleteId;
+    private List<CoachMessage> _messages = [];
+    private string _newMessage = "";
+    private bool _sending;
+    private MudPaper? _messageContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsCoach) { _loading = false; return; }
+
+        try
+        {
+            await CoachService.ValidateCoachAccessAsync(CurrentUser.UserId, AthleteId, default);
+            _hasAccess = true;
+        }
+        catch { _loading = false; return; }
+
+        var rel = await CoachService.GetRelationshipAsync(CurrentUser.UserId, AthleteId, default);
+        if (rel is null) { _loading = false; return; }
+        _coachAthleteId = rel.Id;
+
+        var athlete = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == AthleteId);
+        _athleteName = athlete?.DisplayName ?? "Unknown";
+
+        await LoadMessages();
+
+        // Mark unread messages as read
+        var unread = await Db.CoachMessages
+            .Where(m => m.CoachAthleteId == _coachAthleteId && m.SenderId != CurrentUser.UserId && m.ReadAt == null)
+            .ToListAsync();
+        foreach (var m in unread) m.ReadAt = DateTimeOffset.UtcNow;
+        if (unread.Count > 0) await Db.SaveChangesAsync();
+
+        _loading = false;
+    }
+
+    private async Task LoadMessages()
+    {
+        _messages = await Db.CoachMessages.AsNoTracking()
+            .Where(m => m.CoachAthleteId == _coachAthleteId)
+            .OrderBy(m => m.CreatedAt)
+            .ToListAsync();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_newMessage)) return;
+        _sending = true;
+
+        try
+        {
+            var msg = new CoachMessage
+            {
+                Id = Guid.NewGuid(),
+                CoachAthleteId = _coachAthleteId,
+                SenderId = CurrentUser.UserId,
+                Content = _newMessage.Trim(),
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            Db.CoachMessages.Add(msg);
+            await Db.SaveChangesAsync();
+            _messages.Add(msg);
+            _newMessage = "";
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+
+        _sending = false;
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SendMessage();
+    }
+}

@@ -16,6 +16,9 @@ public class Workout
     public int? PostWorkoutFatigue { get; set; }
     public Guid? ProgramId { get; set; }
     public Program? Program { get; set; }
+    public Guid? ReviewedByCoachId { get; set; }
+    public string? CoachFeedback { get; set; }
+    public DateTimeOffset? ReviewedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<WorkoutSet> Sets { get; set; } = [];

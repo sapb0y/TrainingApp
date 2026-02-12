@@ -78,6 +78,7 @@ else
                         <th>TSB</th>
                         <th>Readiness</th>
                         <th>Alerts</th>
+                        <th>Unreviewed</th>
                         <th>Last Workout</th>
                         <th></th>
                     </tr>
@@ -85,7 +86,7 @@ else
                 <tbody>
                     @foreach (var r in _roster)
                     {
-                        <tr>
+                        <tr style="@(r.AlertCount > 0 ? "border-left: 3px solid #EF4444;" : "")">
                             <td><b>@r.Name</b></td>
                             <td>
                                 @if (r.Tsb.HasValue)
@@ -99,6 +100,13 @@ else
                                 @if (r.AlertCount > 0)
                                 {
                                     <MudChip T="string" Size="Size.Small" Color="Color.Warning">@r.AlertCount</MudChip>
+                                }
+                                else { <span>0</span> }
+                            </td>
+                            <td>
+                                @if (r.UnreviewedCount > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@r.UnreviewedCount</MudChip>
                                 }
                                 else { <span>0</span> }
                             </td>
@@ -181,6 +189,12 @@ else
             .Select(g => new { UserId = g.Key, Last = g.Max(w => w.CompletedAt) })
             .ToDictionaryAsync(x => x.UserId, x => x.Last);
 
+        var unreviewedCounts = await Db.Workouts.AsNoTracking()
+            .Where(w => athleteIds.Contains(w.UserId) && w.Status == WorkoutStatus.Completed && w.ReviewedAt == null)
+            .GroupBy(w => w.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.UserId, x => x.Count);
+
         foreach (var rel in athletes.Where(r => r.AthleteId.HasValue && r.Status == CoachAthleteStatus.Active))
         {
             var aid = rel.AthleteId!.Value;
@@ -197,8 +211,9 @@ else
             }
 
             var alertCount = alertsByAthlete.TryGetValue(aid, out var aa) ? aa.Count : 0;
+            var unreviewed = unreviewedCounts.GetValueOrDefault(aid, 0);
             _roster.Add(new RosterItem(aid, rel.Athlete?.DisplayName ?? "Unknown",
-                metrics?.Tsb, readiness, alertCount, lastW?.LocalDateTime));
+                metrics?.Tsb, readiness, alertCount, unreviewed, lastW?.LocalDateTime));
         }
 
         _needingAttention = alertsByAthlete.Count(kv => kv.Value.Any(a => a.Severity is "Alert" or "Warning"));
@@ -233,5 +248,5 @@ else
         return Color.Success;
     }
 
-    private record RosterItem(Guid AthleteId, string Name, decimal? Tsb, string? Readiness, int AlertCount, DateTime? LastWorkout);
+    private record RosterItem(Guid AthleteId, string Name, decimal? Tsb, string? Readiness, int AlertCount, int UnreviewedCount, DateTime? LastWorkout);
 }

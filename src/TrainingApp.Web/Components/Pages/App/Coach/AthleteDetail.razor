@@ -35,6 +35,8 @@ else
                        OnClick="GoToPrograms">Programs</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="ml-2"
                        OnClick="GoToNotes">Notes</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="ml-2"
+                       OnClick="GoToMessages">Messages</MudButton>
         </Actions>
     </PageHeader>
 
@@ -88,13 +90,13 @@ else
         </MudItem>
     </MudGrid>
 
-    @* ── Recent Workouts ── *@
+    @* ── Recent Workouts + Review ── *@
     <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
         <MudText Typo="Typo.h6" Class="mb-2">Recent Workouts</MudText>
         @if (_recentWorkouts.Any())
         {
             <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
-                <thead><tr><th>Name</th><th>Date</th><th>Status</th><th>Sets</th></tr></thead>
+                <thead><tr><th>Name</th><th>Date</th><th>Status</th><th>Sets</th><th>Reviewed</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var w in _recentWorkouts)
                     {
@@ -103,7 +105,37 @@ else
                             <td>@w.ScheduledAt.LocalDateTime.ToString("MMM d")</td>
                             <td><MudChip T="string" Size="Size.Small" Color="@WorkoutStatusColor(w.Status)">@w.Status</MudChip></td>
                             <td>@w.SetCount</td>
+                            <td>
+                                @if (w.ReviewedAt.HasValue)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                }
+                                else if (w.Status == "Completed")
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.RadioButtonUnchecked" Color="Color.Secondary" Size="Size.Small" />
+                                }
+                            </td>
+                            <td>
+                                @if (w.Status == "Completed")
+                                {
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                               OnClick="() => ToggleReview(w.Id)">
+                                        @(_reviewingWorkoutId == w.Id ? "Close" : "Review")
+                                    </MudButton>
+                                }
+                            </td>
                         </tr>
+                        @if (_reviewingWorkoutId == w.Id)
+                        {
+                            <tr><td colspan="6" style="padding: 12px;">
+                                <MudTextField T="string" Value="@_reviewFeedback" ValueChanged="v => _reviewFeedback = v"
+                                              Label="Coach Feedback" Variant="Variant.Outlined" Lines="2" Class="mb-2" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="() => SubmitReview(w.Id)" Disabled="_savingReview">
+                                    @(w.ReviewedAt.HasValue ? "Update Review" : "Mark Reviewed")
+                                </MudButton>
+                            </td></tr>
+                        }
                     }
                 </tbody>
             </MudSimpleTable>
@@ -240,7 +272,8 @@ else
         // Workouts
         _recentWorkouts = await Db.Workouts.AsNoTracking().Include(w => w.Sets)
             .Where(w => w.UserId == AthleteId).OrderByDescending(w => w.ScheduledAt).Take(10)
-            .Select(w => new WorkoutSummary(w.Name, w.ScheduledAt, w.Status.ToString(), w.Sets.Count))
+            .Select(w => new WorkoutSummary(w.Id, w.Name, w.ScheduledAt, w.Status.ToString(), w.Sets.Count,
+                w.ReviewedAt, w.CoachFeedback))
             .ToListAsync();
 
         // Alerts
@@ -263,8 +296,51 @@ else
         _loading = false;
     }
 
+    // Review
+    private Guid? _reviewingWorkoutId;
+    private string _reviewFeedback = "";
+    private bool _savingReview;
+
+    private void ToggleReview(Guid workoutId)
+    {
+        if (_reviewingWorkoutId == workoutId)
+        {
+            _reviewingWorkoutId = null;
+            return;
+        }
+        _reviewingWorkoutId = workoutId;
+        var w = _recentWorkouts.FirstOrDefault(x => x.Id == workoutId);
+        _reviewFeedback = w?.CoachFeedback ?? "";
+    }
+
+    private async Task SubmitReview(Guid workoutId)
+    {
+        _savingReview = true;
+        try
+        {
+            var workout = await Db.Workouts.FirstOrDefaultAsync(w => w.Id == workoutId);
+            if (workout is not null)
+            {
+                workout.ReviewedByCoachId = CurrentUser.UserId;
+                workout.CoachFeedback = _reviewFeedback;
+                workout.ReviewedAt = DateTimeOffset.UtcNow;
+                await Db.SaveChangesAsync();
+
+                var idx = _recentWorkouts.FindIndex(w => w.Id == workoutId);
+                if (idx >= 0)
+                    _recentWorkouts[idx] = _recentWorkouts[idx] with { ReviewedAt = workout.ReviewedAt, CoachFeedback = _reviewFeedback };
+
+                _reviewingWorkoutId = null;
+                Snackbar.Add("Review saved", Severity.Success);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        _savingReview = false;
+    }
+
     private void GoToPrograms() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}/programs");
     private void GoToNotes() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}/notes");
+    private void GoToMessages() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}/messages");
 
     private static Severity AlertSeverity(string s) => s switch
     {
@@ -276,6 +352,7 @@ else
         "Completed" => Color.Success, "InProgress" => Color.Warning, _ => Color.Default
     };
 
-    private record WorkoutSummary(string Name, DateTimeOffset ScheduledAt, string Status, int SetCount);
+    private record WorkoutSummary(Guid Id, string Name, DateTimeOffset ScheduledAt, string Status, int SetCount,
+        DateTimeOffset? ReviewedAt, string? CoachFeedback);
     private record GoalSummary(string Title, string Type, decimal? TargetValue, decimal? CurrentValue);
 }
