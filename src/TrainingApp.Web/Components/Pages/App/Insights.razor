@@ -1,0 +1,135 @@
+@page "/app/insights"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IInsightGeneratorService InsightService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Insights — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Insights" Subtitle="AI-powered training recommendations">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                   OnClick="Generate" Disabled="_generating">
+            @if (_generating) { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
+            Generate Insights
+        </MudButton>
+    </Actions>
+</PageHeader>
+
+@* ── Category Filter ── *@
+<MudChipSet T="string" SelectedValue="_categoryFilter" SelectedValueChanged="OnCategoryChanged" Class="mb-3">
+    <MudChip T="string" Value="@((string)null!)" Color="Color.Default">All</MudChip>
+    @foreach (var cat in _categories)
+    {
+        <MudChip T="string" Value="@cat" Color="Color.Primary">@cat</MudChip>
+    }
+</MudChipSet>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_insights.Any())
+{
+    <EmptyState Message="No insights yet. Generate insights from your training data!"
+                Icon="@Icons.Material.Filled.Lightbulb"
+                ActionText="Generate" OnAction="Generate" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var insight in _filtered)
+        {
+            <MudItem xs="12" sm="6">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                    <MudCardContent>
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudIcon Icon="@SeverityIcon(insight.Severity)" Color="@SeverityColor(insight.Severity)" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle1"><b>@insight.Title</b></MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@insight.Category</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@SeverityColor(insight.Severity)">@insight.Severity</MudChip>
+                        <MudText Typo="Typo.body2" Class="mt-2">@insight.Message</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                            @insight.GeneratedDate.ToString("MMM d, yyyy") · @insight.RuleName
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+</TierGate>
+
+@code {
+    private bool _loading = true;
+    private bool _generating;
+    private List<Insight> _insights = [];
+    private List<Insight> _filtered = [];
+    private List<string> _categories = [];
+    private string? _categoryFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInsights();
+        _loading = false;
+    }
+
+    private async Task LoadInsights()
+    {
+        var from = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-90);
+        var to = DateOnly.FromDateTime(DateTime.UtcNow);
+        _insights = await InsightService.GetInsightHistoryAsync(CurrentUser.UserId, from, to, null, default);
+        _categories = _insights.Select(i => i.Category).Distinct().OrderBy(c => c).ToList();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        _filtered = string.IsNullOrEmpty(_categoryFilter)
+            ? _insights.OrderByDescending(i => i.GeneratedDate).ToList()
+            : _insights.Where(i => i.Category == _categoryFilter).OrderByDescending(i => i.GeneratedDate).ToList();
+    }
+
+    private async Task OnCategoryChanged(string cat)
+    {
+        _categoryFilter = cat;
+        ApplyFilter();
+        await Task.CompletedTask;
+    }
+
+    private async Task Generate()
+    {
+        _generating = true;
+        try
+        {
+            var newInsights = await InsightService.GenerateInsightsAsync(CurrentUser.UserId, default);
+            Snackbar.Add($"Generated {newInsights.Count} insights", Severity.Success);
+            await LoadInsights();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _generating = false; }
+    }
+
+    private static Color SeverityColor(string severity) => severity.ToLower() switch
+    {
+        "high" or "critical" => Color.Error,
+        "medium" or "warning" => Color.Warning,
+        "low" or "info" => Color.Info,
+        _ => Color.Default
+    };
+
+    private static string SeverityIcon(string severity) => severity.ToLower() switch
+    {
+        "high" or "critical" => Icons.Material.Filled.Warning,
+        "medium" or "warning" => Icons.Material.Filled.Info,
+        _ => Icons.Material.Filled.Lightbulb
+    };
+}
