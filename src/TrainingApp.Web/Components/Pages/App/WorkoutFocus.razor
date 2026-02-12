@@ -1,0 +1,413 @@
+@page "/app/workout/{WorkoutId:guid}/focus"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Focus Mode — FitSpiralS</PageTitle>
+
+<MudThemeProvider Theme="AppTheme.Default" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudSnackbarProvider />
+
+@if (_loading)
+{
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+    </div>
+}
+else if (_workout is null)
+{
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;">
+        <MudText Typo="Typo.h5" Color="Color.Error">Workout not found</MudText>
+    </div>
+}
+else if (_showSummary)
+{
+    @* ── End of Workout Summary ── *@
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;">
+        <MudPaper Elevation="0" Style="border: 1px solid #1F1F2E; max-width: 500px; width: 100%;" Class="pa-6">
+            <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-4">Workout Complete</MudText>
+
+            <MudGrid Spacing="2" Class="mb-4">
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Duration</MudText>
+                    <MudText Typo="Typo.h5">@FormatDuration()</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Sets Completed</MudText>
+                    <MudText Typo="Typo.h5">@_completedSets / @_allSets.Count</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Volume</MudText>
+                    <MudText Typo="Typo.h5">@TotalVolume().ToString("N0") kg</MudText>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Avg RPE</MudText>
+                    <MudText Typo="Typo.h5">@AvgRpe()</MudText>
+                </MudItem>
+            </MudGrid>
+
+            <div class="mb-4">
+                <MudText Typo="Typo.body2" Class="mb-2">Session RPE</MudText>
+                <MudSlider T="int" Value="_sessionRpe" ValueChanged="v => _sessionRpe = v"
+                           Min="1" Max="10" Step="1" Color="Color.Primary" />
+                <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">@_sessionRpe / 10</MudText>
+            </div>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       OnClick="FinishWorkout" StartIcon="@Icons.Material.Filled.Check">
+                Save & Exit
+            </MudButton>
+        </MudPaper>
+    </div>
+}
+else
+{
+    @* ── Focus Mode UI ── *@
+    <div style="display:flex;flex-direction:column;height:100vh;background:#0A0A0F;padding:16px;">
+
+        @* Top bar *@
+        <div class="d-flex align-center justify-space-between mb-2">
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="ExitFocus"
+                       StartIcon="@Icons.Material.Filled.Close" Size="Size.Small">Exit</MudButton>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@_workout.Name</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ShowSummary"
+                       Size="Size.Small" StartIcon="@Icons.Material.Filled.Stop">End</MudButton>
+        </div>
+
+        @* Progress *@
+        <MudProgressLinear Value="@Progress()" Color="Color.Primary" Class="mb-2" Rounded="true" Size="Size.Medium" />
+        <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary" Class="mb-4">
+            Exercise @(_currentExerciseIndex + 1)/@_exerciseGroups.Count
+        </MudText>
+
+        @* Current exercise + set *@
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+
+            @if (_currentGroup is not null)
+            {
+                <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1">@_currentGroup.ExerciseName</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mb-4">
+                    Set @(_currentSetInGroup + 1) of @_currentGroup.Sets.Count
+                </MudText>
+
+                @if (_currentSet is not null)
+                {
+                    @if (_resting)
+                    {
+                        @* ── Rest Timer ── *@
+                        <MudText Typo="Typo.overline" Color="Color.Secondary" Align="Align.Center">REST</MudText>
+                        <MudText Typo="Typo.h2" Align="Align.Center" Color="Color.Primary" Class="mb-2">
+                            @FormatTimer(_timerRemaining)
+                        </MudText>
+
+                        <div class="mb-4" style="width: 280px;">
+                            <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-1">RPE for last set</MudText>
+                            <MudSlider T="decimal" Value="_currentRpe" ValueChanged="OnRpeChanged"
+                                       Min="1" Max="10" Step="0.5m" Color="Color.Warning" />
+                            <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Warning">@_currentRpe</MudText>
+                        </div>
+
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="SkipRest">
+                            Skip Rest
+                        </MudButton>
+                    }
+                    else
+                    {
+                        @* ── Active Set ── *@
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mb-2">
+                            Target: @(_currentSet.TargetWeight.HasValue ? $"{_currentSet.TargetWeight}kg x " : "")@(_currentSet.TargetReps ?? 0) reps
+                        </MudText>
+
+                        <div class="d-flex gap-4 mb-4">
+                            <MudNumericField T="decimal?" Label="Weight (kg)" Value="_inputWeight"
+                                             ValueChanged="v => _inputWeight = v"
+                                             Variant="Variant.Outlined" Style="width: 130px;" />
+                            <MudNumericField T="int?" Label="Reps" Value="_inputReps"
+                                             ValueChanged="v => _inputReps = v"
+                                             Variant="Variant.Outlined" Style="width: 100px;" />
+                        </div>
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                                   OnClick="CompleteSet" StartIcon="@Icons.Material.Filled.Check"
+                                   Style="min-width: 220px;">
+                            Complete Set
+                        </MudButton>
+                    }
+                }
+            }
+        </div>
+
+        @* Bottom nav *@
+        <div class="d-flex justify-space-between align-center mt-2" style="padding: 8px 0;">
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="PrevExercise"
+                       Disabled="_currentExerciseIndex == 0" StartIcon="@Icons.Material.Filled.ChevronLeft">
+                Prev
+            </MudButton>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_completedSets / @_allSets.Count sets done
+            </MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="NextExercise"
+                       Disabled="_currentExerciseIndex >= _exerciseGroups.Count - 1"
+                       EndIcon="@Icons.Material.Filled.ChevronRight">
+                Next
+            </MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid WorkoutId { get; set; }
+
+    private bool _loading = true;
+    private Workout? _workout;
+    private List<WorkoutSet> _allSets = [];
+    private List<ExerciseGroup> _exerciseGroups = [];
+
+    // Navigation
+    private int _currentExerciseIndex;
+    private int _currentSetInGroup;
+    private ExerciseGroup? _currentGroup;
+    private WorkoutSet? _currentSet;
+
+    // Input
+    private decimal? _inputWeight;
+    private int? _inputReps;
+    private decimal _currentRpe = 7;
+
+    // Rest timer
+    private bool _resting;
+    private int _timerRemaining;
+    private int _defaultRestSeconds = 90;
+    private DotNetObjectReference<WorkoutFocus>? _dotNetRef;
+
+    // Summary
+    private bool _showSummary;
+    private int _sessionRpe = 7;
+    private int _completedSets;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _workout = await Db.Workouts
+            .Include(w => w.Sets).ThenInclude(s => s.Exercise)
+            .FirstOrDefaultAsync(w => w.Id == WorkoutId && w.UserId == CurrentUser.UserId);
+
+        if (_workout is null) { _loading = false; return; }
+
+        // Ensure workout is in progress
+        if (_workout.Status == WorkoutStatus.Planned)
+        {
+            _workout.Status = WorkoutStatus.InProgress;
+            _workout.StartedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+        }
+
+        // Load user settings for rest timer
+        var user = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == CurrentUser.UserId);
+        if (user?.Settings is not null)
+            _defaultRestSeconds = user.Settings.DefaultRestSeconds;
+
+        _allSets = _workout.Sets.OrderBy(s => s.SetNumber).ToList();
+        _exerciseGroups = _allSets
+            .GroupBy(s => s.ExerciseId)
+            .Select(g => new ExerciseGroup(
+                g.Key,
+                g.First().Exercise?.Name ?? "Unknown",
+                g.OrderBy(s => s.SetNumber).ToList()))
+            .ToList();
+
+        _completedSets = _allSets.Count(s => s.CompletedAt.HasValue);
+
+        // Find first incomplete set
+        NavigateToFirstIncomplete();
+        UpdateCurrentSet();
+
+        _loading = false;
+    }
+
+    private void NavigateToFirstIncomplete()
+    {
+        for (var i = 0; i < _exerciseGroups.Count; i++)
+        {
+            var incomplete = _exerciseGroups[i].Sets.FindIndex(s => !s.CompletedAt.HasValue);
+            if (incomplete >= 0)
+            {
+                _currentExerciseIndex = i;
+                _currentSetInGroup = incomplete;
+                return;
+            }
+        }
+        // All complete
+        _currentExerciseIndex = 0;
+        _currentSetInGroup = 0;
+    }
+
+    private void UpdateCurrentSet()
+    {
+        _currentGroup = _exerciseGroups.Count > _currentExerciseIndex
+            ? _exerciseGroups[_currentExerciseIndex] : null;
+        _currentSet = _currentGroup?.Sets.Count > _currentSetInGroup
+            ? _currentGroup.Sets[_currentSetInGroup] : null;
+
+        if (_currentSet is not null)
+        {
+            _inputWeight = _currentSet.ActualWeight ?? _currentSet.TargetWeight;
+            _inputReps = _currentSet.ActualReps ?? _currentSet.TargetReps;
+        }
+    }
+
+    private async Task CompleteSet()
+    {
+        if (_currentSet is null) return;
+
+        _currentSet.ActualWeight = _inputWeight;
+        _currentSet.ActualReps = _inputReps;
+        _currentSet.CompletedAt = DateTimeOffset.UtcNow;
+        _currentSet.PerformedAt = DateTimeOffset.UtcNow;
+
+        await Db.SaveChangesAsync();
+        _completedSets = _allSets.Count(s => s.CompletedAt.HasValue);
+
+        // Start rest timer
+        _resting = true;
+        _timerRemaining = _defaultRestSeconds;
+        _currentRpe = 7;
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("timerInterop.start", _defaultRestSeconds, _dotNetRef);
+    }
+
+    [JSInvokable]
+    public void OnTimerTick(int remaining)
+    {
+        _timerRemaining = remaining;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnTimerComplete()
+    {
+        await SaveRpeAndAdvance();
+    }
+
+    private async Task SkipRest()
+    {
+        await JS.InvokeVoidAsync("timerInterop.stop");
+        await SaveRpeAndAdvance();
+    }
+
+    private async Task SaveRpeAndAdvance()
+    {
+        // Save RPE to the just-completed set
+        if (_currentSet is not null)
+        {
+            _currentSet.Rpe = _currentRpe;
+            await Db.SaveChangesAsync();
+        }
+
+        _resting = false;
+
+        // Advance to next set
+        if (_currentGroup is not null && _currentSetInGroup < _currentGroup.Sets.Count - 1)
+        {
+            _currentSetInGroup++;
+        }
+        else if (_currentExerciseIndex < _exerciseGroups.Count - 1)
+        {
+            _currentExerciseIndex++;
+            _currentSetInGroup = 0;
+        }
+        else
+        {
+            // All sets done
+            _showSummary = true;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        UpdateCurrentSet();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnRpeChanged(decimal value) => _currentRpe = value;
+
+    private void PrevExercise()
+    {
+        if (_currentExerciseIndex > 0)
+        {
+            _currentExerciseIndex--;
+            _currentSetInGroup = 0;
+            _resting = false;
+            UpdateCurrentSet();
+        }
+    }
+
+    private void NextExercise()
+    {
+        if (_currentExerciseIndex < _exerciseGroups.Count - 1)
+        {
+            _currentExerciseIndex++;
+            _currentSetInGroup = 0;
+            _resting = false;
+            UpdateCurrentSet();
+        }
+    }
+
+    private void ShowSummary()
+    {
+        _showSummary = true;
+    }
+
+    private async Task FinishWorkout()
+    {
+        if (_workout is null) return;
+
+        _workout.Status = WorkoutStatus.Completed;
+        _workout.CompletedAt = DateTimeOffset.UtcNow;
+        _workout.SessionRpe = _sessionRpe;
+        await Db.SaveChangesAsync();
+
+        Nav.NavigateTo($"/app/workouts/{_workout.Id}");
+    }
+
+    private void ExitFocus() => Nav.NavigateTo($"/app/workouts/{WorkoutId}");
+
+    private double Progress() =>
+        _allSets.Count > 0 ? (double)_completedSets / _allSets.Count * 100 : 0;
+
+    private string FormatDuration()
+    {
+        if (_workout?.StartedAt is null) return "—";
+        var d = DateTimeOffset.UtcNow - _workout.StartedAt.Value;
+        return d.TotalHours >= 1 ? $"{d.Hours}h {d.Minutes}m" : $"{d.Minutes}m";
+    }
+
+    private decimal TotalVolume() =>
+        _allSets.Where(s => s.ActualWeight.HasValue && s.ActualReps.HasValue)
+            .Sum(s => s.ActualWeight!.Value * s.ActualReps!.Value);
+
+    private string AvgRpe()
+    {
+        var withRpe = _allSets.Where(s => s.Rpe.HasValue).ToList();
+        return withRpe.Count > 0 ? withRpe.Average(s => s.Rpe!.Value).ToString("N1") : "—";
+    }
+
+    private static string FormatTimer(int seconds) =>
+        $"{seconds / 60}:{seconds % 60:D2}";
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        _ = JS.InvokeVoidAsync("timerInterop.stop");
+    }
+
+    private sealed record ExerciseGroup(Guid ExerciseId, string ExerciseName, List<WorkoutSet> Sets);
+}

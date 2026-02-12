@@ -1,0 +1,205 @@
+@page "/app/workout-now"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject ISmartWorkoutService SmartService
+@inject ICurrentUserService CurrentUser
+@inject TrainingAppDbContext Db
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Workout Now — FitSpiralS</PageTitle>
+
+<PageHeader Title="Workout Now" Subtitle="Choose a workout tailored to your readiness">
+    <Actions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="GoBack"
+                   StartIcon="@Icons.Material.Filled.ArrowBack">Back</MudButton>
+    </Actions>
+</PageHeader>
+
+@* ── Duration picker ── *@
+<MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+    <div class="d-flex align-center gap-4">
+        <MudText Typo="Typo.body1">Duration:</MudText>
+        <MudSlider T="int" Value="_duration" ValueChanged="OnDurationChanged"
+                   Min="15" Max="90" Step="5" Color="Color.Primary" Style="max-width: 300px;" />
+        <MudText Typo="Typo.h6" Color="Color.Primary">@_duration min</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Refresh" OnClick="GenerateOptions"
+                   Disabled="_generating">
+            @(_generating ? "Generating..." : "Generate")
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_generating)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_options.Count == 0 && _hasGenerated)
+{
+    <EmptyState Message="No exercises available yet. Exercises sync from wger on first boot — try again in a minute."
+                Icon="@Icons.Material.Filled.HourglassEmpty" />
+}
+else if (_options.Count > 0)
+{
+    <MudGrid Spacing="3">
+        @foreach (var opt in _options)
+        {
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E; height: 100%;">
+                    <MudCardContent>
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudIcon Icon="@TypeIcon(opt.Type)" Color="@TypeColor(opt.Type)" />
+                            <MudText Typo="Typo.h6">@opt.Name</MudText>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">@opt.Description</MudText>
+                        <MudDivider Class="mb-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">
+                            @opt.Exercises.Count exercises
+                        </MudText>
+                        @foreach (var ex in opt.Exercises.Take(5))
+                        {
+                            <div class="d-flex justify-space-between align-center py-1" style="border-bottom: 1px solid #1a1a2a;">
+                                <MudText Typo="Typo.body2">@Truncate(ex.ExerciseName, 22)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @ex.Sets x @ex.Reps @(ex.SuggestedWeight.HasValue ? $"@ {ex.SuggestedWeight}kg" : "")
+                                </MudText>
+                            </div>
+                        }
+                        @if (opt.Exercises.Count > 5)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                +@(opt.Exercises.Count - 5) more
+                            </MudText>
+                        }
+                    </MudCardContent>
+                    <MudCardActions Class="pa-3">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="() => StartWorkout(opt)" Disabled="_starting">
+                            Start
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private int _duration = 45;
+    private bool _generating;
+    private bool _hasGenerated;
+    private bool _starting;
+    private List<WorkoutOption> _options = [];
+
+    protected override async Task OnInitializedAsync() => await GenerateOptions();
+
+    private async Task OnDurationChanged(int value)
+    {
+        _duration = value;
+    }
+
+    private async Task GenerateOptions()
+    {
+        _generating = true;
+        _hasGenerated = true;
+        StateHasChanged();
+
+        try
+        {
+            _options = await SmartService.GenerateWorkoutOptionsAsync(CurrentUser.UserId, _duration);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate: {ex.Message}", Severity.Error);
+        }
+
+        _generating = false;
+    }
+
+    private async Task StartWorkout(WorkoutOption opt)
+    {
+        _starting = true;
+        StateHasChanged();
+
+        try
+        {
+            var workout = new Workout
+            {
+                Id = Guid.NewGuid(),
+                UserId = CurrentUser.UserId,
+                Name = opt.Name,
+                ScheduledAt = DateTimeOffset.UtcNow,
+                StartedAt = DateTimeOffset.UtcNow,
+                Status = WorkoutStatus.InProgress,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            Db.Workouts.Add(workout);
+
+            var setNumber = 1;
+            foreach (var ex in opt.Exercises)
+            {
+                for (var s = 0; s < ex.Sets; s++)
+                {
+                    Db.WorkoutSets.Add(new WorkoutSet
+                    {
+                        Id = Guid.NewGuid(),
+                        WorkoutId = workout.Id,
+                        ExerciseId = ex.ExerciseId,
+                        SetNumber = setNumber++,
+                        TargetReps = ex.Reps,
+                        TargetWeight = ex.SuggestedWeight
+                    });
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            Nav.NavigateTo($"/app/workout/{workout.Id}/focus");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to create workout: {ex.Message}", Severity.Error);
+            _starting = false;
+        }
+    }
+
+    private void GoBack() => Nav.NavigateTo("/app/workouts");
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..(max - 1)] + "…";
+
+    private static string TypeIcon(WorkoutType t) => t switch
+    {
+        WorkoutType.Strength => Icons.Material.Filled.FitnessCenter,
+        WorkoutType.Power => Icons.Material.Filled.FlashOn,
+        WorkoutType.Hypertrophy => Icons.Material.Filled.Accessibility,
+        WorkoutType.Endurance => Icons.Material.Filled.DirectionsRun,
+        WorkoutType.MetabolicConditioning => Icons.Material.Filled.LocalFireDepartment,
+        WorkoutType.Recovery => Icons.Material.Filled.Spa,
+        WorkoutType.Mobility => Icons.Material.Filled.SelfImprovement,
+        WorkoutType.HIIT => Icons.Material.Filled.Timer,
+        WorkoutType.Deload => Icons.Material.Filled.Battery3Bar,
+        _ => Icons.Material.Filled.FitnessCenter
+    };
+
+    private static Color TypeColor(WorkoutType t) => t switch
+    {
+        WorkoutType.Strength => Color.Error,
+        WorkoutType.Power => Color.Warning,
+        WorkoutType.Hypertrophy => Color.Primary,
+        WorkoutType.Endurance => Color.Info,
+        WorkoutType.MetabolicConditioning => Color.Warning,
+        WorkoutType.Recovery => Color.Success,
+        WorkoutType.Mobility => Color.Tertiary,
+        WorkoutType.HIIT => Color.Error,
+        WorkoutType.Deload => Color.Success,
+        _ => Color.Default
+    };
+}

@@ -32,11 +32,15 @@ else
         <Actions>
             @if (_workout.Status == WorkoutStatus.Planned)
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow"
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Fullscreen"
+                           Href="@($"/app/workout/{WorkoutId}/focus")" Class="mr-2">Focus Mode</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow"
                            OnClick="StartWorkout" Class="mr-2">Start</MudButton>
             }
             else if (_workout.Status == WorkoutStatus.InProgress)
             {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Fullscreen"
+                           Href="@($"/app/workout/{WorkoutId}/focus")" Class="mr-2">Focus Mode</MudButton>
                 <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Done"
                            OnClick="CompleteWorkout" Class="mr-2">Complete</MudButton>
             }
