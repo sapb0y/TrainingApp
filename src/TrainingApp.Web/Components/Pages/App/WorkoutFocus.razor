@@ -339,10 +339,11 @@ else
 
     private void OnRpeChanged(decimal value) => _currentRpe = value;
 
-    private void PrevExercise()
+    private async Task PrevExercise()
     {
         if (_currentExerciseIndex > 0)
         {
+            await JS.InvokeVoidAsync("timerInterop.stop");
             _currentExerciseIndex--;
             _currentSetInGroup = 0;
             _resting = false;
@@ -350,10 +351,11 @@ else
         }
     }
 
-    private void NextExercise()
+    private async Task NextExercise()
     {
         if (_currentExerciseIndex < _exerciseGroups.Count - 1)
         {
+            await JS.InvokeVoidAsync("timerInterop.stop");
             _currentExerciseIndex++;
             _currentSetInGroup = 0;
             _resting = false;

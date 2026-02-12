@@ -85,7 +85,20 @@ else
                 @foreach (var workout in phase.Workouts.OrderBy(w => w.OrderIndex))
                 {
                     <MudExpansionPanels Class="mb-2">
-                        <MudExpansionPanel Text="@($"{workout.Name} (Day {workout.DayNumber})")">
+                        <MudExpansionPanel>
+                            <TitleContent>
+                                <div class="d-flex align-center gap-2">
+                                    <MudText Typo="Typo.body1">@workout.Name (Day @workout.DayNumber)</MudText>
+                                    @if (_canModify)
+                                    {
+                                        <span @onclick="() => OpenCopyDialog(workout)" @onclick:stopPropagation="true">
+                                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary"
+                                                       StartIcon="@Icons.Material.Filled.ContentCopy">Copy</MudButton>
+                                        </span>
+                                    }
+                                </div>
+                            </TitleContent>
+                            <ChildContent>
                             <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
                                 <thead><tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>RPE</th><th>Rest</th>
                                     @if (_canModify) { <th></th> }
@@ -93,6 +106,8 @@ else
                                 <tbody>
                                     @foreach (var ex in workout.Exercises.OrderBy(e => e.OrderIndex))
                                     {
+                                        var orderedExs = workout.Exercises.OrderBy(e => e.OrderIndex).ToList();
+                                        var idx = orderedExs.IndexOf(ex);
                                         <tr>
                                             <td>@(ex.Exercise?.Name ?? "Unknown")</td>
                                             <td>
@@ -127,7 +142,15 @@ else
                                             <td>@(ex.RestSeconds)s</td>
                                             @if (_canModify)
                                             {
-                                                <td>
+                                                <td class="d-flex align-center gap-1">
+                                                    <MudTooltip Text="Move up">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                                                       Disabled="idx == 0" OnClick="() => MoveExercise(ex, workout, -1)" />
+                                                    </MudTooltip>
+                                                    <MudTooltip Text="Move down">
+                                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                                       Disabled="idx == orderedExs.Count - 1" OnClick="() => MoveExercise(ex, workout, 1)" />
+                                                    </MudTooltip>
                                                     @if (_editingExerciseId == ex.Id)
                                                     {
                                                         <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text"
@@ -146,6 +169,15 @@ else
                                     }
                                 </tbody>
                             </MudSimpleTable>
+                            @if (_canModify)
+                            {
+                                <div class="mt-2">
+                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Add"
+                                               OnClick="() => OpenAddExercise(workout)">Add Exercise</MudButton>
+                                </div>
+                            }
+                            </ChildContent>
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 }
@@ -183,6 +215,65 @@ else
     </DialogActions>
 </MudDialog>
 
+@* ── Add Exercise Dialog ── *@
+<MudDialog @bind-Visible="_showAddExercise">
+    <TitleContent>Add Exercise</TitleContent>
+    <DialogContent>
+        <MudAutocomplete T="Exercise" Label="Search exercises" @bind-Value="_addSelectedExercise"
+                          SearchFunc="SearchExercises" ToStringFunc="@(e => e?.Name ?? "")"
+                          Variant="Variant.Outlined" Class="mb-3" />
+        <MudNumericField T="int" @bind-Value="_addSets" Label="Sets" Variant="Variant.Outlined" Min="1" Max="20" Class="mb-3" />
+        <div class="d-flex gap-2 mb-3">
+            <MudNumericField T="int" @bind-Value="_addRepsMin" Label="Reps Min" Variant="Variant.Outlined" Min="1" />
+            <MudNumericField T="int" @bind-Value="_addRepsMax" Label="Reps Max" Variant="Variant.Outlined" Min="1" />
+        </div>
+        <MudNumericField T="decimal?" @bind-Value="_addRpe" Label="Target RPE" Variant="Variant.Outlined" Min="1" Max="10" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showAddExercise = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddExercise"
+                   Disabled="@(_addSelectedExercise is null)">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ── Copy Workout Dialog ── *@
+<MudDialog @bind-Visible="_showCopyWorkout">
+    <TitleContent>Copy Workout to Another Athlete</TitleContent>
+    <DialogContent>
+        <MudSelect T="Guid?" Label="Target Athlete" Value="_copyTargetAthleteId" ValueChanged="OnCopyAthleteChanged"
+                   Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var a in _coachAthletes)
+            {
+                <MudSelectItem T="Guid?" Value="@a.AthleteId">@a.AthleteName</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_copyTargetAthleteId.HasValue)
+        {
+            <MudSelect T="Guid?" Label="Target Program" Value="_copyTargetProgramId" ValueChanged="OnCopyProgramChanged"
+                       Variant="Variant.Outlined" Class="mb-3">
+                @foreach (var p in _copyTargetPrograms)
+                {
+                    <MudSelectItem T="Guid?" Value="@p.Id">@p.Name</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_copyTargetProgramId.HasValue)
+            {
+                <MudSelect T="Guid?" @bind-Value="_copyTargetWorkoutId" Label="Target Workout" Variant="Variant.Outlined">
+                    @foreach (var w in _copyTargetWorkouts)
+                    {
+                        <MudSelectItem T="Guid?" Value="@w.Id">@w.Name (Day @w.DayNumber)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCopyWorkout = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CopyWorkout"
+                   Disabled="@(!_copyTargetWorkoutId.HasValue)">Copy</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter] public Guid AthleteId { get; set; }
 
@@ -204,6 +295,25 @@ else
     private string _genTemplate = "PushPullLegs";
     private int _genDuration = 8;
     private DateTime? _genStart = DateTime.Today;
+
+    // Add exercise
+    private bool _showAddExercise;
+    private ProgramWorkout? _addTargetWorkout;
+    private Exercise? _addSelectedExercise;
+    private int _addSets = 3;
+    private int _addRepsMin = 8;
+    private int _addRepsMax = 12;
+    private decimal? _addRpe = 7;
+
+    // Copy workout
+    private bool _showCopyWorkout;
+    private ProgramWorkout? _copySourceWorkout;
+    private List<AthleteOption> _coachAthletes = [];
+    private Guid? _copyTargetAthleteId;
+    private List<ProgramSummary> _copyTargetPrograms = [];
+    private Guid? _copyTargetProgramId;
+    private List<WorkoutOption> _copyTargetWorkouts = [];
+    private Guid? _copyTargetWorkoutId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -303,6 +413,159 @@ else
         catch (Exception ex2) { Snackbar.Add(ex2.Message, Severity.Error); }
     }
 
+    // ── R1: Add Exercise ──
+    private void OpenAddExercise(ProgramWorkout workout)
+    {
+        _addTargetWorkout = workout;
+        _addSelectedExercise = null;
+        _addSets = 3; _addRepsMin = 8; _addRepsMax = 12; _addRpe = 7;
+        _showAddExercise = true;
+    }
+
+    private async Task<IEnumerable<Exercise>> SearchExercises(string? value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return await Db.Exercises.AsNoTracking().OrderBy(e => e.Name).Take(20).ToListAsync(ct);
+        return await Db.Exercises.AsNoTracking()
+            .Where(e => EF.Functions.ILike(e.Name, $"%{value}%"))
+            .OrderBy(e => e.Name).Take(20).ToListAsync(ct);
+    }
+
+    private async Task AddExercise()
+    {
+        if (_addTargetWorkout is null || _addSelectedExercise is null) return;
+        try
+        {
+            var maxOrder = _addTargetWorkout.Exercises.Any()
+                ? _addTargetWorkout.Exercises.Max(e => e.OrderIndex) : -1;
+            var pe = new ProgramExercise
+            {
+                Id = Guid.NewGuid(),
+                ProgramWorkoutId = _addTargetWorkout.Id,
+                ExerciseId = _addSelectedExercise.Id,
+                OrderIndex = maxOrder + 1,
+                TargetSets = _addSets,
+                TargetRepsMin = _addRepsMin,
+                TargetRepsMax = _addRepsMax,
+                TargetRpe = _addRpe,
+                RestSeconds = 120
+            };
+            Db.ProgramExercises.Add(pe);
+            await Db.SaveChangesAsync();
+            _showAddExercise = false;
+            if (_selectedProgramId.HasValue) await SelectProgram(_selectedProgramId.Value);
+            Snackbar.Add("Exercise added", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    // ── R2: Reorder Exercises ──
+    private async Task MoveExercise(ProgramExercise ex, ProgramWorkout workout, int direction)
+    {
+        var ordered = workout.Exercises.OrderBy(e => e.OrderIndex).ToList();
+        var idx = ordered.IndexOf(ex);
+        var swapIdx = idx + direction;
+        if (swapIdx < 0 || swapIdx >= ordered.Count) return;
+
+        var other = ordered[swapIdx];
+        (ex.OrderIndex, other.OrderIndex) = (other.OrderIndex, ex.OrderIndex);
+
+        try
+        {
+            await Db.SaveChangesAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex2) { Snackbar.Add(ex2.Message, Severity.Error); }
+    }
+
+    // ── R3: Copy Workout ──
+    private async Task OpenCopyDialog(ProgramWorkout workout)
+    {
+        _copySourceWorkout = workout;
+        _copyTargetAthleteId = null;
+        _copyTargetProgramId = null;
+        _copyTargetWorkoutId = null;
+        _copyTargetPrograms = [];
+        _copyTargetWorkouts = [];
+
+        var athletes = await CoachService.GetAthletesAsync(CurrentUser.UserId, default);
+        _coachAthletes = athletes
+            .Where(a => a.AthleteId.HasValue && a.Status == CoachAthleteStatus.Active)
+            .Select(a => new AthleteOption(a.AthleteId!.Value, a.Athlete?.DisplayName ?? "Unknown"))
+            .ToList();
+        _showCopyWorkout = true;
+    }
+
+    private async Task OnCopyAthleteChanged(Guid? athleteId)
+    {
+        _copyTargetAthleteId = athleteId;
+        _copyTargetProgramId = null;
+        _copyTargetWorkoutId = null;
+        _copyTargetWorkouts = [];
+        if (athleteId.HasValue)
+        {
+            _copyTargetPrograms = await Db.Programs.AsNoTracking()
+                .Where(p => p.UserId == athleteId.Value)
+                .OrderByDescending(p => p.CreatedAt)
+                .Select(p => new ProgramSummary(p.Id, p.Name, "", "", "", 0, p.CreatedAt))
+                .ToListAsync();
+        }
+        else _copyTargetPrograms = [];
+    }
+
+    private async Task OnCopyProgramChanged(Guid? programId)
+    {
+        _copyTargetProgramId = programId;
+        _copyTargetWorkoutId = null;
+        if (programId.HasValue)
+        {
+            _copyTargetWorkouts = await Db.ProgramWorkouts.AsNoTracking()
+                .Where(w => w.ProgramPhase != null && w.ProgramPhase.ProgramId == programId.Value)
+                .OrderBy(w => w.OrderIndex)
+                .Select(w => new WorkoutOption(w.Id, w.Name, w.DayNumber))
+                .ToListAsync();
+        }
+        else _copyTargetWorkouts = [];
+    }
+
+    private async Task CopyWorkout()
+    {
+        if (_copySourceWorkout is null || !_copyTargetWorkoutId.HasValue) return;
+        try
+        {
+            var sourceExercises = _copySourceWorkout.Exercises.OrderBy(e => e.OrderIndex).ToList();
+            // Get max order in target workout
+            var existingMax = await Db.ProgramExercises.AsNoTracking()
+                .Where(pe => pe.ProgramWorkoutId == _copyTargetWorkoutId.Value)
+                .Select(pe => (int?)pe.OrderIndex).MaxAsync() ?? -1;
+
+            foreach (var src in sourceExercises)
+            {
+                existingMax++;
+                var clone = new ProgramExercise
+                {
+                    Id = Guid.NewGuid(),
+                    ProgramWorkoutId = _copyTargetWorkoutId.Value,
+                    ExerciseId = src.ExerciseId,
+                    OrderIndex = existingMax,
+                    TargetSets = src.TargetSets,
+                    TargetRepsMin = src.TargetRepsMin,
+                    TargetRepsMax = src.TargetRepsMax,
+                    TargetRpe = src.TargetRpe,
+                    IntensityPercentage = src.IntensityPercentage,
+                    RestSeconds = src.RestSeconds,
+                    Notes = src.Notes,
+                    SupersetGroup = src.SupersetGroup
+                };
+                Db.ProgramExercises.Add(clone);
+            }
+            await Db.SaveChangesAsync();
+            _showCopyWorkout = false;
+            Snackbar.Add($"Copied {sourceExercises.Count} exercises", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
     private void GoBack() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}");
 
     private static Color ProgramStatusColor(string s) => s switch
@@ -311,4 +574,6 @@ else
     };
 
     private record ProgramSummary(Guid Id, string Name, string Goal, string Template, string Status, int DurationWeeks, DateTimeOffset CreatedAt);
+    private record AthleteOption(Guid AthleteId, string AthleteName);
+    private record WorkoutOption(Guid Id, string Name, int DayNumber);
 }

@@ -4,6 +4,9 @@
 @inject NavigationManager Nav
 @using TrainingApp.Core.Interfaces
 @using TrainingApp.Core.Entities
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Infrastructure.Data
+@inject TrainingAppDbContext Db
 
 <MudThemeProvider Theme="AppTheme.Default" IsDarkMode="true" />
 <MudPopoverProvider />
@@ -87,7 +90,18 @@
             }
 
             <MudDivider Class="my-2" />
-            <MudNavLink Href="/app/messages" Icon="@Icons.Material.Filled.Chat">Messages</MudNavLink>
+            <MudNavLink Href="/app/messages" Icon="@Icons.Material.Filled.Chat">
+                @if (_unreadMessages > 0)
+                {
+                    <MudBadge Content="@_unreadMessages" Color="Color.Error" Overlap="false" Class="mr-2">
+                        <span>Messages</span>
+                    </MudBadge>
+                }
+                else
+                {
+                    <span>Messages</span>
+                }
+            </MudNavLink>
             <MudNavLink Href="/app/subscription" Icon="@Icons.Material.Filled.CreditCard">Subscription</MudNavLink>
             <MudNavLink Href="/app/settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
             <MudNavLink Href="/app/export" Icon="@Icons.Material.Filled.Download">Export</MudNavLink>
@@ -111,6 +125,7 @@
 @code {
     private bool _drawerOpen = true;
     private bool _noSubscription;
+    private int _unreadMessages;
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,6 +135,11 @@
             _noSubscription = sub is null ||
                 sub.Status == SubscriptionStatus.Expired ||
                 sub.Status == SubscriptionStatus.Cancelled;
+
+            _unreadMessages = await Db.CoachMessages.AsNoTracking()
+                .Where(m => m.SenderId != CurrentUser.UserId && m.ReadAt == null &&
+                    (m.CoachAthlete!.AthleteId == CurrentUser.UserId || m.CoachAthlete!.CoachId == CurrentUser.UserId))
+                .CountAsync();
         }
         catch
         {

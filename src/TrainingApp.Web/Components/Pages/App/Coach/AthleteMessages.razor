@@ -11,6 +11,7 @@
 @inject TrainingAppDbContext Db
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Messages — FitSpiralS</PageTitle>
 
@@ -33,7 +34,7 @@ else
         </Actions>
     </PageHeader>
 
-    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E; max-height: 500px; overflow-y: auto;" @ref="_messageContainer">
+    <MudPaper Elevation="0" Class="pa-4" id="message-container" Style="border: 1px solid #1F1F2E; max-height: 500px; overflow-y: auto;" @ref="_messageContainer">
         @if (!_messages.Any())
         {
             <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">No messages yet. Start the conversation!</MudText>
@@ -77,6 +78,7 @@ else
     private string _newMessage = "";
     private bool _sending;
     private MudPaper? _messageContainer;
+    private bool _shouldScroll;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,6 +99,7 @@ else
         _athleteName = athlete?.DisplayName ?? "Unknown";
 
         await LoadMessages();
+        _shouldScroll = true;
 
         // Mark unread messages as read
         var unread = await Db.CoachMessages
@@ -106,6 +109,15 @@ else
         if (unread.Count > 0) await Db.SaveChangesAsync();
 
         _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldScroll)
+        {
+            _shouldScroll = false;
+            await JS.InvokeVoidAsync("scrollToBottom", "message-container");
+        }
     }
 
     private async Task LoadMessages()
@@ -135,6 +147,7 @@ else
             await Db.SaveChangesAsync();
             _messages.Add(msg);
             _newMessage = "";
+            _shouldScroll = true;
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
 

@@ -56,7 +56,11 @@ else
             @foreach (var a in _alerts.Take(10))
             {
                 <MudAlert Severity="@AlertSeverity(a.Severity)" Dense="true" Class="mb-1" NoIcon="false">
-                    <b>@a.AthleteName</b> — @a.Message
+                    <div class="d-flex align-center justify-space-between" style="width:100%;">
+                        <span><b>@a.AthleteName</b> — @a.Message</span>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Inherit"
+                                   OnClick="() => AlertAction(a)">@AlertActionLabel(a.Category)</MudButton>
+                    </div>
                 </MudAlert>
             }
             @if (_alerts.Count > 10)
@@ -76,8 +80,10 @@ else
                     <tr>
                         <th>Athlete</th>
                         <th>TSB</th>
+                        <th>Trend</th>
                         <th>Readiness</th>
                         <th>Alerts</th>
+                        <th>7d Risk</th>
                         <th>Unreviewed</th>
                         <th>Last Workout</th>
                         <th></th>
@@ -95,6 +101,20 @@ else
                                 }
                                 else { <span>—</span> }
                             </td>
+                            <td>
+                                @if (r.Trend == "Improving")
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Small" />
+                                }
+                                else if (r.Trend == "Worsening")
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Color="Color.Error" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.TrendingFlat" Color="Color.Default" Size="Size.Small" />
+                                }
+                            </td>
                             <td>@(r.Readiness ?? "—")</td>
                             <td>
                                 @if (r.AlertCount > 0)
@@ -102,6 +122,10 @@ else
                                     <MudChip T="string" Size="Size.Small" Color="Color.Warning">@r.AlertCount</MudChip>
                                 }
                                 else { <span>0</span> }
+                            </td>
+                            <td>
+                                @{ var (riskLabel, riskColor) = RiskDisplay(r.Risk); }
+                                <MudChip T="string" Size="Size.Small" Color="@riskColor">@riskLabel</MudChip>
                             </td>
                             <td>
                                 @if (r.UnreviewedCount > 0)
@@ -195,6 +219,14 @@ else
             .Select(g => new { UserId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.UserId, x => x.Count);
 
+        // Load 7-day metric history for trend + risk
+        var sevenDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
+        var recentMetrics = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => athleteIds.Contains(m.UserId) && m.Date >= sevenDaysAgo)
+            .OrderBy(m => m.Date)
+            .ToListAsync();
+        var metricsByAthlete = recentMetrics.GroupBy(m => m.UserId).ToDictionary(g => g.Key, g => g.ToList());
+
         foreach (var rel in athletes.Where(r => r.AthleteId.HasValue && r.Status == CoachAthleteStatus.Active))
         {
             var aid = rel.AthleteId!.Value;
@@ -212,8 +244,14 @@ else
 
             var alertCount = alertsByAthlete.TryGetValue(aid, out var aa) ? aa.Count : 0;
             var unreviewed = unreviewedCounts.GetValueOrDefault(aid, 0);
+
+            // Trend: compare current alert count to 7-day-ago alert count proxy via TSB direction
+            var history = metricsByAthlete.GetValueOrDefault(aid, []);
+            var trend = ComputeTrend(alertCount, history);
+            var risk = ComputeRisk(history, metrics?.Tsb);
+
             _roster.Add(new RosterItem(aid, rel.Athlete?.DisplayName ?? "Unknown",
-                metrics?.Tsb, readiness, alertCount, unreviewed, lastW?.LocalDateTime));
+                metrics?.Tsb, readiness, alertCount, unreviewed, lastW?.LocalDateTime, trend, risk));
         }
 
         _needingAttention = alertsByAthlete.Count(kv => kv.Value.Any(a => a.Severity is "Alert" or "Warning"));
@@ -234,6 +272,74 @@ else
 
     private void GoToAthlete(Guid id) => Nav.NavigateTo($"/app/coach/athlete/{id}");
 
+    // ── R6: Alert Actions ──
+    private void AlertAction(CoachAlertEngine.CoachAlert alert)
+    {
+        var id = alert.AthleteId;
+        var url = alert.Category switch
+        {
+            CoachAlertEngine.CoachAlertCategory.FatigueRisk or CoachAlertEngine.CoachAlertCategory.OverreachingRisk
+                => $"/app/coach/athlete/{id}/programs",
+            CoachAlertEngine.CoachAlertCategory.MissedSessions
+                => $"/app/coach/athlete/{id}/messages",
+            _ => $"/app/coach/athlete/{id}"
+        };
+        Nav.NavigateTo(url);
+    }
+
+    private static string AlertActionLabel(CoachAlertEngine.CoachAlertCategory cat) => cat switch
+    {
+        CoachAlertEngine.CoachAlertCategory.FatigueRisk or CoachAlertEngine.CoachAlertCategory.OverreachingRisk => "View Programs",
+        CoachAlertEngine.CoachAlertCategory.MissedSessions => "Send Message",
+        CoachAlertEngine.CoachAlertCategory.RPEDrift => "Review Workouts",
+        _ => "View Athlete"
+    };
+
+    // ── R4: Trend ──
+    private static string ComputeTrend(int currentAlertCount, List<DailyMetrics> history)
+    {
+        if (history.Count < 2) return "Stable";
+        // Use TSB slope as proxy for improving/worsening
+        var tsbValues = history.Select(m => m.Tsb).ToList();
+        var slope = TsbSlope(tsbValues);
+        if (slope > 0.5m) return "Improving";
+        if (slope < -0.5m) return "Worsening";
+        return "Stable";
+    }
+
+    // ── R5: 7-day Risk ──
+    private static string ComputeRisk(List<DailyMetrics> history, decimal? currentTsb)
+    {
+        if (history.Count < 2) return "Unknown";
+        var slope = TsbSlope(history.Select(m => m.Tsb).ToList());
+        var tsb = currentTsb ?? history.Last().Tsb;
+        if (slope < 0 && tsb < 0) return "High";
+        if (slope < 0 && tsb >= 0) return "Watch";
+        return "Low";
+    }
+
+    private static decimal TsbSlope(List<decimal> values)
+    {
+        if (values.Count < 2) return 0;
+        // Simple linear regression slope
+        var n = values.Count;
+        decimal sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        for (int i = 0; i < n; i++)
+        {
+            sumX += i; sumY += values[i]; sumXY += i * values[i]; sumX2 += i * i;
+        }
+        var denom = n * sumX2 - sumX * sumX;
+        return denom == 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+    }
+
+    private static (string Label, Color Color) RiskDisplay(string risk) => risk switch
+    {
+        "High" => ("High Risk", Color.Error),
+        "Watch" => ("Watch", Color.Warning),
+        "Low" => ("Low Risk", Color.Success),
+        _ => ("Unknown", Color.Default)
+    };
+
     private static Severity AlertSeverity(string s) => s switch
     {
         "Alert" => Severity.Error,
@@ -248,5 +354,6 @@ else
         return Color.Success;
     }
 
-    private record RosterItem(Guid AthleteId, string Name, decimal? Tsb, string? Readiness, int AlertCount, int UnreviewedCount, DateTime? LastWorkout);
+    private record RosterItem(Guid AthleteId, string Name, decimal? Tsb, string? Readiness,
+        int AlertCount, int UnreviewedCount, DateTime? LastWorkout, string Trend, string Risk);
 }
