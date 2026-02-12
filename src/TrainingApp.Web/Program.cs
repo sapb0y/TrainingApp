@@ -5,6 +5,7 @@ using TrainingApp.Core.Interfaces;
 using TrainingApp.Infrastructure;
 using TrainingApp.Infrastructure.Data;
 using TrainingApp.Web.Components;
+using TrainingApp.Orchestration;
 using TrainingApp.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,6 +43,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, WebCurrentUserService>();
 
+builder.Services.AddOrchestration();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddMudServices();
@@ -63,6 +66,12 @@ app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapGet("/logout", async (SignInManager<User> sm) =>
+{
+    await sm.SignOutAsync();
+    return Results.Redirect("/");
+});
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
@@ -73,6 +82,7 @@ static async Task SeedAdminAsync(IServiceProvider services)
     using var scope = services.CreateScope();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+    var db = scope.ServiceProvider.GetRequiredService<TrainingAppDbContext>();
 
     string[] roles = ["Admin", "Coach", "Athlete"];
     foreach (var role in roles)
@@ -81,21 +91,47 @@ static async Task SeedAdminAsync(IServiceProvider services)
             await roleManager.CreateAsync(new IdentityRole<Guid> { Name = role });
     }
 
-    const string adminEmail = "admin@fitspirals.com";
-    var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
-    if (existingAdmin is null)
+    var seedAccounts = new[]
     {
-        var admin = new User
+        ("admin@fitspirals.com", "Fs!2026$Adm1n", "Admin", "Admin", (SubscriptionTier?)null),
+        ("coach@fitspirals.com", "Fs!2026$Coach", "Coach Demo", "Coach", (SubscriptionTier?)SubscriptionTier.Coach),
+        ("competitor@fitspirals.com", "Fs!2026$Comp", "Competitor Demo", "Athlete", (SubscriptionTier?)SubscriptionTier.Competitor),
+        ("athlete@fitspirals.com", "Fs!2026$Athl", "Athlete Demo", "Athlete", (SubscriptionTier?)SubscriptionTier.Athlete),
+    };
+
+    foreach (var (email, password, displayName, role, tier) in seedAccounts)
+    {
+        var existing = await userManager.FindByEmailAsync(email);
+        if (existing is not null) continue;
+
+        var user = new User
         {
-            UserName = adminEmail,
-            Email = adminEmail,
-            DisplayName = "Admin",
+            UserName = email,
+            Email = email,
+            DisplayName = displayName,
             EmailConfirmed = true
         };
-        var result = await userManager.CreateAsync(admin, "Fs!2026$Adm1n");
-        if (result.Succeeded)
+
+        var result = await userManager.CreateAsync(user, password);
+        if (!result.Succeeded) continue;
+
+        await userManager.AddToRoleAsync(user, role);
+
+        if (tier.HasValue)
         {
-            await userManager.AddToRoleAsync(admin, "Admin");
+            db.UserSubscriptions.Add(new UserSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                Tier = tier.Value,
+                Status = SubscriptionStatus.Active,
+                StartDate = DateTimeOffset.UtcNow,
+                CurrentPeriodEnd = DateTimeOffset.UtcNow.AddYears(1),
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
         }
     }
+
+    await db.SaveChangesAsync();
 }

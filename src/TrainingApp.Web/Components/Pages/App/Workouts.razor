@@ -199,24 +199,31 @@ else
     {
         if (string.IsNullOrWhiteSpace(_newName)) return;
 
-        var workout = new Workout
+        try
         {
-            Id = Guid.NewGuid(),
-            UserId = CurrentUser.UserId,
-            Name = _newName.Trim(),
-            ScheduledAt = _newDate.HasValue
-                ? new DateTimeOffset(_newDate.Value, TimeSpan.Zero)
-                : DateTimeOffset.UtcNow,
-            Status = WorkoutStatus.Planned,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
+            var workout = new Workout
+            {
+                Id = Guid.NewGuid(),
+                UserId = CurrentUser.UserId,
+                Name = _newName.Trim(),
+                ScheduledAt = _newDate.HasValue
+                    ? new DateTimeOffset(_newDate.Value, TimeSpan.Zero)
+                    : DateTimeOffset.UtcNow,
+                Status = WorkoutStatus.Planned,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
 
-        Db.Workouts.Add(workout);
-        await Db.SaveChangesAsync();
+            Db.Workouts.Add(workout);
+            await Db.SaveChangesAsync();
 
-        _showCreateDialog = false;
-        Snackbar.Add("Workout created", Severity.Success);
-        Nav.NavigateTo($"/app/workouts/{workout.Id}");
+            _showCreateDialog = false;
+            Snackbar.Add("Workout created", Severity.Success);
+            Nav.NavigateTo($"/app/workouts/{workout.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to create workout: {ex.Message}", Severity.Error);
+        }
     }
 
     private static Color StatusColor(WorkoutStatus status) => status switch

@@ -9,4 +9,5 @@ public interface IWgerClient
     Task<WgerCategoryResponse> GetCategoriesAsync(CancellationToken ct = default);
     Task<WgerMuscleResponse> GetMusclesAsync(CancellationToken ct = default);
     Task<WgerEquipmentResponse> GetEquipmentAsync(CancellationToken ct = default);
+    Task<Dictionary<int, string>> GetExerciseImageMapAsync(CancellationToken ct = default);
 }

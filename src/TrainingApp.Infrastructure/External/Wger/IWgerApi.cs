@@ -23,4 +23,10 @@ public interface IWgerApi
 
     [Get("/exercisecategory/")]
     Task<WgerCategoryResponse> GetCategoriesAsync(CancellationToken ct = default);
+
+    [Get("/exerciseimage/")]
+    Task<WgerImageResponse> GetExerciseImagesAsync(
+        [Query] int? limit = 100,
+        [Query] int? offset = 0,
+        CancellationToken ct = default);
 }

@@ -1,0 +1,211 @@
+@page "/app/settings"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Settings — FitSpiralS</PageTitle>
+
+<PageHeader Title="Settings" Subtitle="Configure your training preferences" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_settings is not null)
+{
+    <MudGrid Spacing="3">
+        @* ── Training ── *@
+        <MudItem xs="12">
+            <MudText Typo="Typo.h6" Class="mb-2">Training</MudText>
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="string" Label="Weight Unit" Value="_settings.WeightUnit"
+                                   ValueChanged="v => _settings.WeightUnit = v" Variant="Variant.Outlined">
+                            <MudSelectItem T="string" Value="@("kg")">kg</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("lbs")">lbs</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="int" Label="Default Rest (seconds)" Value="_settings.DefaultRestSeconds"
+                                         ValueChanged="v => _settings.DefaultRestSeconds = v"
+                                         Variant="Variant.Outlined" Min="15" Max="600" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="decimal" Label="RPE Target" Value="_settings.RpeTarget"
+                                         ValueChanged="v => _settings.RpeTarget = v"
+                                         Variant="Variant.Outlined" Min="1" Max="10" Step="0.5m" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="TrainingExperience" Label="Experience" Value="_settings.Experience"
+                                   ValueChanged="v => _settings.Experience = v" Variant="Variant.Outlined">
+                            @foreach (var exp in Enum.GetValues<TrainingExperience>())
+                            {
+                                <MudSelectItem T="TrainingExperience" Value="@exp">@exp</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSwitch T="bool" Label="Auto-Progression" Color="Color.Primary"
+                                   Value="_settings.AutoProgressionEnabled"
+                                   ValueChanged="v => _settings.AutoProgressionEnabled = v" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* ── Body ── *@
+        <MudItem xs="12">
+            <MudText Typo="Typo.h6" Class="mb-2">Body</MudText>
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4">
+                        <MudDatePicker Label="Date of Birth" Date="_dob" DateChanged="OnDobChanged"
+                                       Variant="Variant.Outlined" MaxDate="DateTime.Today" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="BiologicalSex?" Label="Sex" Value="_settings.Sex"
+                                   ValueChanged="v => _settings.Sex = v" Variant="Variant.Outlined" Clearable="true">
+                            <MudSelectItem T="BiologicalSex?" Value="BiologicalSex.Male">Male</MudSelectItem>
+                            <MudSelectItem T="BiologicalSex?" Value="BiologicalSex.Female">Female</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="decimal?" Label="Height (cm)" Value="_settings.HeightCm"
+                                         ValueChanged="v => _settings.HeightCm = v"
+                                         Variant="Variant.Outlined" Min="50" Max="250" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="ActivityLevel" Label="Activity Level" Value="_settings.ActivityLevel"
+                                   ValueChanged="v => _settings.ActivityLevel = v" Variant="Variant.Outlined">
+                            @foreach (var lvl in Enum.GetValues<ActivityLevel>())
+                            {
+                                <MudSelectItem T="ActivityLevel" Value="@lvl">@lvl</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="WeightGoal" Label="Weight Goal" Value="_settings.WeightGoal"
+                                   ValueChanged="v => _settings.WeightGoal = v" Variant="Variant.Outlined">
+                            @foreach (var goal in Enum.GetValues<WeightGoal>())
+                            {
+                                <MudSelectItem T="WeightGoal" Value="@goal">@goal</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="decimal?" Label="Target Weight (kg)" Value="_settings.TargetWeightKg"
+                                         ValueChanged="v => _settings.TargetWeightKg = v"
+                                         Variant="Variant.Outlined" Min="30" Max="300" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* ── Cardio ── *@
+        <MudItem xs="12">
+            <MudText Typo="Typo.h6" Class="mb-2">Cardio</MudText>
+            <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="int?" Label="Max Heart Rate" Value="_settings.MaxHeartRate"
+                                         ValueChanged="v => _settings.MaxHeartRate = v"
+                                         Variant="Variant.Outlined" Min="100" Max="250" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="CardioPlacement" Label="Cardio Placement" Value="_settings.CardioPlacement"
+                                   ValueChanged="v => _settings.CardioPlacement = v" Variant="Variant.Outlined">
+                            @foreach (var p in Enum.GetValues<CardioPlacement>())
+                            {
+                                <MudSelectItem T="CardioPlacement" Value="@p">@p</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField T="int" Label="Min Separation (hours)" Value="_settings.MinSeparationHours"
+                                         ValueChanged="v => _settings.MinSeparationHours = v"
+                                         Variant="Variant.Outlined" Min="0" Max="48" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* ── Save ── *@
+        <MudItem xs="12" Class="d-flex justify-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveAsync" Disabled="_saving">
+                @(_saving ? "Saving..." : "Save Settings")
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private UserSettings? _settings;
+    private DateTime? _dob;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await Db.Users.FirstOrDefaultAsync(u => u.Id == CurrentUser.UserId);
+        if (user is not null)
+        {
+            _settings = user.Settings;
+            _dob = _settings.DateOfBirth?.ToDateTime(TimeOnly.MinValue);
+        }
+        _loading = false;
+    }
+
+    private void OnDobChanged(DateTime? value)
+    {
+        _dob = value;
+        _settings!.DateOfBirth = value.HasValue ? DateOnly.FromDateTime(value.Value) : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_settings is null) return;
+        _saving = true;
+
+        try
+        {
+            var user = await Db.Users.FirstAsync(u => u.Id == CurrentUser.UserId);
+            user.Settings = new UserSettings
+            {
+                WeightUnit = _settings.WeightUnit,
+                DefaultRestSeconds = _settings.DefaultRestSeconds,
+                AutoProgressionEnabled = _settings.AutoProgressionEnabled,
+                RpeTarget = _settings.RpeTarget,
+                Experience = _settings.Experience,
+                DateOfBirth = _settings.DateOfBirth,
+                RecoveryCapacity = _settings.RecoveryCapacity,
+                Sex = _settings.Sex,
+                HeightCm = _settings.HeightCm,
+                ActivityLevel = _settings.ActivityLevel,
+                WeightGoal = _settings.WeightGoal,
+                TargetWeightKg = _settings.TargetWeightKg,
+                MaxHeartRate = _settings.MaxHeartRate,
+                CardioPlacement = _settings.CardioPlacement,
+                MinSeparationHours = _settings.MinSeparationHours
+            };
+            Db.Entry(user).Property(u => u.Settings).IsModified = true;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+            await Db.SaveChangesAsync();
+            Snackbar.Add("Settings saved", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save: {ex.Message}", Severity.Error);
+        }
+
+        _saving = false;
+    }
+}

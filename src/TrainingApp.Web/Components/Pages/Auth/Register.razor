@@ -1,9 +1,11 @@
 @page "/register"
 @using Microsoft.AspNetCore.Identity
 @using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
 @inject UserManager<User> UserManager
 @inject SignInManager<User> SignInManager
 @inject NavigationManager Navigation
+@inject ISubscriptionService SubscriptionService
 
 <PageTitle>Register — FitSpiralS</PageTitle>
 
@@ -84,8 +86,9 @@
         if (result.Succeeded)
         {
             await UserManager.AddToRoleAsync(user, "Athlete");
+            await SubscriptionService.CreateTrialAsync(user.Id);
             await SignInManager.SignInAsync(user, isPersistent: true);
-            Navigation.NavigateTo("/", forceLoad: true);
+            Navigation.NavigateTo("/app/dashboard", forceLoad: true);
         }
         else
         {

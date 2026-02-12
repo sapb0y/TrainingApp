@@ -77,6 +77,18 @@ public class ExerciseCacheService : IExerciseCacheService
         var muscles = await _wgerClient.GetMusclesAsync(ct);
         var equipment = await _wgerClient.GetEquipmentAsync(ct);
 
+        Dictionary<int, string> imageMap;
+        try
+        {
+            imageMap = await _wgerClient.GetExerciseImageMapAsync(ct);
+            _logger.LogInformation("Fetched {Count} exercise images from wger", imageMap.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch exercise images, continuing without images");
+            imageMap = [];
+        }
+
         var categoryMap = categories.Results.ToDictionary(c => c.Id, c => c.Name);
         var muscleMap = muscles.Results.ToDictionary(m => m.Id, m => m.NameEn ?? m.Name);
         var equipmentMap = equipment.Results.ToDictionary(e => e.Id, e => e.Name);
@@ -109,6 +121,7 @@ public class ExerciseCacheService : IExerciseCacheService
                 exercise.PrimaryMuscles = dto.Muscles.Select(m => muscleMap.GetValueOrDefault(m, "Unknown")).ToList();
                 exercise.SecondaryMuscles = dto.MusclesSecondary.Select(m => muscleMap.GetValueOrDefault(m, "Unknown")).ToList();
                 exercise.Equipment = dto.Equipment.Select(e => equipmentMap.GetValueOrDefault(e, "Unknown")).ToList();
+                exercise.ImageUrl = imageMap.GetValueOrDefault(dto.Id);
                 exercise.CachedAt = DateTimeOffset.UtcNow;
 
                 if (existing is null)

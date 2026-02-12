@@ -37,4 +37,29 @@ public class WgerClient : IWgerClient
     {
         return await _api.GetEquipmentAsync(ct);
     }
+
+    public async Task<Dictionary<int, string>> GetExerciseImageMapAsync(CancellationToken ct = default)
+    {
+        var map = new Dictionary<int, string>();
+        var offset = 0;
+        var hasMore = true;
+
+        while (hasMore)
+        {
+            var response = await _api.GetExerciseImagesAsync(limit: 100, offset: offset, ct);
+
+            foreach (var img in response.Results)
+            {
+                if (img.Is_Main && !map.ContainsKey(img.Exercise_Base))
+                    map[img.Exercise_Base] = img.Image;
+            }
+
+            hasMore = response.Next is not null;
+            offset += 100;
+
+            if (offset > 5000) break; // Safety limit
+        }
+
+        return map;
+    }
 }

@@ -10,6 +10,7 @@ public class Exercise
     public List<string> PrimaryMuscles { get; set; } = [];
     public List<string> SecondaryMuscles { get; set; } = [];
     public List<string> Equipment { get; set; } = [];
+    public string? ImageUrl { get; set; }
     public bool IsCustom { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public DateTimeOffset? CachedAt { get; set; }

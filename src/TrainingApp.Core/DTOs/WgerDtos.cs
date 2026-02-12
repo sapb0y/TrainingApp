@@ -48,3 +48,16 @@ public record WgerEquipmentDto(
     int Id,
     string Name
 );
+
+public record WgerImageResponse(
+    int Count,
+    string? Next,
+    List<WgerImageDto> Results
+);
+
+public record WgerImageDto(
+    int Id,
+    int Exercise_Base,
+    string Image,
+    bool Is_Main
+);
