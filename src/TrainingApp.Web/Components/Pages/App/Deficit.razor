@@ -1,0 +1,223 @@
+@page "/app/deficit"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IDeficitPhaseService DeficitService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Deficit Phase — FitSpiralS</PageTitle>
+
+<PageHeader Title="Deficit Phase" Subtitle="Manage fat loss phases with diet breaks" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_active is not null)
+{
+    @* ── Active Phase ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <div class="d-flex align-center justify-space-between mb-3">
+            <div>
+                <MudText Typo="Typo.h6">Active Deficit</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@PhaseStatusColor(_active.Status)">@_active.Status</MudChip>
+            </div>
+            <div class="d-flex gap-2">
+                @if (_active.Status == DeficitPhaseStatus.Active)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="Pause">Pause</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="End">End Phase</MudButton>
+                }
+                else if (_active.Status == DeficitPhaseStatus.Paused)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Resume">Resume</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="End">End Phase</MudButton>
+                }
+            </div>
+        </div>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="6" sm="3">
+                <StatCard Label="START WEIGHT" Value="@_active.StartWeightKg.ToString("N1")" Unit="kg" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="TARGET" Value="@(_active.TargetWeightKg?.ToString("N1") ?? "—")" Unit="kg" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="WEEKLY RATE" Value="@_active.WeeklyRateKg.ToString("N2")" Unit="kg/wk" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="STRATEGY" Value="@_active.Strategy.ToString()" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="STARTED" Value="@_active.StartDate.ToString("MMM d, yyyy")" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="DURATION" Value="@DurationWeeks(_active)" Unit="weeks" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="ADAPTATION" Value="@(_active.CurrentAdaptationPercent?.ToString("N1") ?? "0")" Unit="%" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="DIET BREAK" Value="@DietBreakStatus(_active)"
+                          Subtitle="@(_active.DietBreakIntervalWeeks.HasValue ? $"Every {_active.DietBreakIntervalWeeks} weeks" : "None scheduled")" />
+            </MudItem>
+        </MudGrid>
+
+        @if (!string.IsNullOrEmpty(_active.Notes))
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-3">@_active.Notes</MudText>
+        }
+    </MudPaper>
+}
+else
+{
+    @* ── Start New Phase ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Start a Deficit Phase</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal" @bind-Value="_startWeight" Label="Start Weight (kg)"
+                                 Variant="Variant.Outlined" Min="30m" Max="300m" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal?" @bind-Value="_targetWeight" Label="Target Weight (kg)"
+                                 Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal" @bind-Value="_weeklyRate" Label="Weekly Rate (kg/wk)"
+                                 Variant="Variant.Outlined" Min="0.1m" Max="1.5m" Step="0.1m" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="DeficitStrategy" @bind-Value="_strategy" Label="Strategy" Variant="Variant.Outlined">
+                    @foreach (var s in Enum.GetValues<DeficitStrategy>())
+                    {
+                        <MudSelectItem T="DeficitStrategy" Value="s">@s</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="int?" @bind-Value="_dietBreakWeeks" Label="Diet Break Every (weeks)"
+                                 Variant="Variant.Outlined" Min="2" Max="12" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField T="string" @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="Start">Start Deficit</MudButton>
+    </MudPaper>
+}
+
+@* ── History ── *@
+@if (_history.Any())
+{
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Deficit History</MudText>
+        <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th>Start</th>
+                    <th>Target</th>
+                    <th>Strategy</th>
+                    <th>Rate</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _history.OrderByDescending(p => p.StartDate))
+                {
+                    <tr>
+                        <td>@p.StartDate.ToString("MMM d") — @(p.EndDate?.ToString("MMM d") ?? "now")</td>
+                        <td>@p.StartWeightKg.ToString("N1") kg</td>
+                        <td>@(p.TargetWeightKg?.ToString("N1") ?? "—") kg</td>
+                        <td>@p.Strategy</td>
+                        <td>@p.WeeklyRateKg.ToString("N2") kg/wk</td>
+                        <td>@DurationWeeks(p) wk</td>
+                        <td><MudChip T="string" Size="Size.Small" Color="@PhaseStatusColor(p.Status)">@p.Status</MudChip></td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private DeficitPhase? _active;
+    private List<DeficitPhase> _history = [];
+
+    // Start form
+    private decimal _startWeight = 80;
+    private decimal? _targetWeight;
+    private decimal _weeklyRate = 0.5m;
+    private DeficitStrategy _strategy = DeficitStrategy.Moderate;
+    private int? _dietBreakWeeks = 4;
+    private string? _notes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        _loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        _active = await DeficitService.GetActiveDeficitAsync(CurrentUser.UserId);
+        _history = await DeficitService.GetDeficitHistoryAsync(CurrentUser.UserId);
+    }
+
+    private async Task Start()
+    {
+        await DeficitService.StartDeficitAsync(CurrentUser.UserId, _startWeight, _targetWeight,
+            _weeklyRate, _strategy, _dietBreakWeeks, _notes);
+        await LoadData();
+        Snackbar.Add("Deficit phase started", Severity.Success);
+    }
+
+    private async Task Pause()
+    {
+        await DeficitService.PauseDeficitAsync(CurrentUser.UserId);
+        await LoadData();
+        Snackbar.Add("Deficit paused", Severity.Info);
+    }
+
+    private async Task Resume()
+    {
+        await DeficitService.ResumeDeficitAsync(CurrentUser.UserId);
+        await LoadData();
+        Snackbar.Add("Deficit resumed", Severity.Success);
+    }
+
+    private async Task End()
+    {
+        await DeficitService.EndDeficitAsync(CurrentUser.UserId);
+        await LoadData();
+        Snackbar.Add("Deficit phase ended", Severity.Info);
+    }
+
+    private static string DurationWeeks(DeficitPhase p)
+    {
+        var end = p.EndDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        return ((end.DayNumber - p.StartDate.DayNumber) / 7).ToString();
+    }
+
+    private static string DietBreakStatus(DeficitPhase p)
+    {
+        if (!p.DietBreakIntervalWeeks.HasValue) return "N/A";
+        if (p.LastDietBreakDate.HasValue) return p.LastDietBreakDate.Value.ToString("MMM d");
+        return "Due soon";
+    }
+
+    private static Color PhaseStatusColor(DeficitPhaseStatus s) => s switch
+    {
+        DeficitPhaseStatus.Active => Color.Success,
+        DeficitPhaseStatus.Paused => Color.Warning,
+        DeficitPhaseStatus.Completed => Color.Info,
+        _ => Color.Default
+    };
+}

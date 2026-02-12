@@ -1,0 +1,281 @@
+@page "/app/coach/athlete/{AthleteId:guid}"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject ICoachAthleteService CoachService
+@inject ICoachAlertAggregatorService AlertService
+@inject ICurrentUserService CurrentUser
+@inject TrainingAppDbContext Db
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Athlete Detail — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Coach">
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_athlete is null)
+{
+    <MudAlert Severity="Severity.Error">Athlete not found or you don't have access.</MudAlert>
+}
+else
+{
+    <PageHeader Title="@_athlete.DisplayName" Subtitle="Athlete overview">
+        <Actions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/app/coach">Back to Dashboard</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="ml-2"
+                       OnClick="GoToPrograms">Programs</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="ml-2"
+                       OnClick="GoToNotes">Notes</MudButton>
+        </Actions>
+    </PageHeader>
+
+    @* ── Snapshot Cards ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <StatCard Label="CTL" Value="@(_fatigueCTL?.ToString("F0") ?? "—")" Icon="@Icons.Material.Filled.FitnessCenter"
+                      Subtitle="Chronic Training Load" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="ATL" Value="@(_fatigueATL?.ToString("F0") ?? "—")" Icon="@Icons.Material.Filled.Speed"
+                      Subtitle="Acute Training Load" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="TSB" Value="@(_fatigueTSB?.ToString("F0") ?? "—")" Icon="@Icons.Material.Filled.Balance"
+                      Subtitle="@(_readiness ?? "No data")" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="Volume (7d)" Value="@(_totalVolume7d > 0 ? _totalVolume7d.ToString("N0") : "—")"
+                      Icon="@Icons.Material.Filled.BarChart" Unit="kg"
+                      Subtitle="@(_volumeChangePct.HasValue ? $"{(_volumeChangePct > 0 ? "+" : "")}{_volumeChangePct:F0}% vs prev" : "")" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── Alerts ── *@
+    @if (_alerts.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Alerts</MudText>
+            @foreach (var a in _alerts)
+            {
+                <MudAlert Severity="@AlertSeverity(a.Severity)" Dense="true" Class="mb-1">
+                    @a.Message
+                </MudAlert>
+            }
+        </MudPaper>
+    }
+
+    @* ── Strength Summary ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="4">
+            <StatCard Label="Exercises Tracked" Value="@_exercisesTracked.ToString()" Icon="@Icons.Material.Filled.FormatListNumbered" />
+        </MudItem>
+        <MudItem xs="6" sm="4">
+            <StatCard Label="Top e1RM" Value="@(_topE1rm?.ToString("F0") ?? "—")" Unit="kg"
+                      Icon="@Icons.Material.Filled.EmojiEvents" Subtitle="@(_topExercise ?? "")" />
+        </MudItem>
+        <MudItem xs="6" sm="4">
+            <StatCard Label="e1RM Change" Value="@(_e1rmChangePct?.ToString("F1") ?? "—")" Unit="%"
+                      Icon="@Icons.Material.Filled.TrendingUp" Subtitle="30d trend" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── Recent Workouts ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-2">Recent Workouts</MudText>
+        @if (_recentWorkouts.Any())
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead><tr><th>Name</th><th>Date</th><th>Status</th><th>Sets</th></tr></thead>
+                <tbody>
+                    @foreach (var w in _recentWorkouts)
+                    {
+                        <tr>
+                            <td>@w.Name</td>
+                            <td>@w.ScheduledAt.LocalDateTime.ToString("MMM d")</td>
+                            <td><MudChip T="string" Size="Size.Small" Color="@WorkoutStatusColor(w.Status)">@w.Status</MudChip></td>
+                            <td>@w.SetCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No recent workouts</MudText>
+        }
+    </MudPaper>
+
+    @* ── Goals ── *@
+    @if (_goals.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Active Goals</MudText>
+            @foreach (var g in _goals)
+            {
+                var pct = g.TargetValue.HasValue && g.TargetValue > 0 && g.CurrentValue.HasValue
+                    ? (double)(g.CurrentValue.Value / g.TargetValue.Value * 100m)
+                    : 0.0;
+                <MudCard Elevation="0" Class="mb-2 pa-3" Style="border: 1px solid #1F1F2E;">
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.body1"><b>@g.Title</b></MudText>
+                        <MudChip T="string" Size="Size.Small">@g.Type</MudChip>
+                    </div>
+                    <MudProgressLinear Value="pct" Color="Color.Primary" Class="mt-1" Rounded="true" Size="Size.Medium" />
+                </MudCard>
+            }
+        </MudPaper>
+    }
+
+    @* ── Deficit Status ── *@
+    @if (_deficitStatus is not null)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">Active deficit phase: @_deficitStatus</MudAlert>
+    }
+}
+
+</TierGate>
+
+@code {
+    [Parameter] public Guid AthleteId { get; set; }
+
+    private bool _loading = true;
+    private User? _athlete;
+
+    // Fatigue
+    private decimal? _fatigueCTL, _fatigueATL, _fatigueTSB;
+    private string? _readiness;
+
+    // Volume
+    private decimal _totalVolume7d;
+    private decimal? _volumeChangePct;
+
+    // Strength
+    private int _exercisesTracked;
+    private decimal? _topE1rm;
+    private string? _topExercise;
+    private decimal? _e1rmChangePct;
+
+    // Data
+    private List<CoachAlertEngine.CoachAlert> _alerts = [];
+    private List<WorkoutSummary> _recentWorkouts = [];
+    private List<GoalSummary> _goals = [];
+    private string? _deficitStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsCoach) { _loading = false; return; }
+
+        try
+        {
+            await CoachService.ValidateCoachAccessAsync(CurrentUser.UserId, AthleteId, default);
+        }
+        catch { _loading = false; return; }
+
+        _athlete = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == AthleteId);
+        if (_athlete is null) { _loading = false; return; }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sevenDaysAgo = today.AddDays(-7);
+        var thirtyDaysAgo = today.AddDays(-30);
+        var sixtyDaysAgo = today.AddDays(-60);
+
+        // Fatigue
+        var latestMetrics = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == AthleteId).OrderByDescending(m => m.Date).FirstOrDefaultAsync();
+        _fatigueCTL = latestMetrics?.Ctl;
+        _fatigueATL = latestMetrics?.Atl;
+        _fatigueTSB = latestMetrics?.Tsb;
+        if (latestMetrics?.ReadinessScore is not null)
+        {
+            _readiness = latestMetrics.ReadinessScore.Value switch
+            {
+                >= 8m => "Excellent", >= 6m => "Good", >= 4m => "Moderate", >= 3m => "Poor", _ => "Very Poor"
+            };
+        }
+
+        // Volume
+        var last7d = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == AthleteId && m.Date >= sevenDaysAgo).ToListAsync();
+        var prev7d = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == AthleteId && m.Date >= sevenDaysAgo.AddDays(-7) && m.Date < sevenDaysAgo).ToListAsync();
+        _totalVolume7d = last7d.Sum(m => m.TotalVolume);
+        var prevVol = prev7d.Sum(m => m.TotalVolume);
+        _volumeChangePct = prevVol > 0 ? Math.Round((_totalVolume7d - prevVol) / prevVol * 100m, 1) : null;
+
+        // Strength
+        var recentSets = await Db.WorkoutSets.AsNoTracking()
+            .Include(s => s.Workout).Include(s => s.Exercise)
+            .Where(s => s.Workout!.UserId == AthleteId && !s.IsWarmup
+                && s.ActualWeight != null && s.ActualReps != null
+                && s.ActualReps >= 1 && s.ActualReps <= 30
+                && s.Workout!.CompletedAt != null
+                && DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime) >= sixtyDaysAgo)
+            .Select(s => new { Date = DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime),
+                ExerciseName = s.Exercise!.Name,
+                E1rm = s.ActualWeight!.Value * (1 + s.ActualReps!.Value / 30m) })
+            .ToListAsync();
+
+        var exerciseBests = recentSets.Where(s => s.Date >= thirtyDaysAgo)
+            .GroupBy(s => s.ExerciseName).Select(g => new { Name = g.Key, Best = g.Max(s => s.E1rm) }).ToList();
+        _exercisesTracked = exerciseBests.Count;
+        var top = exerciseBests.OrderByDescending(e => e.Best).FirstOrDefault();
+        _topE1rm = top?.Best;
+        _topExercise = top?.Name;
+        if (top is not null)
+        {
+            var prevBest = recentSets.Where(s => s.ExerciseName == top.Name && s.Date >= sixtyDaysAgo && s.Date < thirtyDaysAgo)
+                .Select(s => s.E1rm).DefaultIfEmpty(0).Max();
+            if (prevBest > 0) _e1rmChangePct = Math.Round((top.Best - prevBest) / prevBest * 100m, 1);
+        }
+
+        // Workouts
+        _recentWorkouts = await Db.Workouts.AsNoTracking().Include(w => w.Sets)
+            .Where(w => w.UserId == AthleteId).OrderByDescending(w => w.ScheduledAt).Take(10)
+            .Select(w => new WorkoutSummary(w.Name, w.ScheduledAt, w.Status.ToString(), w.Sets.Count))
+            .ToListAsync();
+
+        // Alerts
+        _alerts = await AlertService.GetAlertsForAthleteAsync(CurrentUser.UserId, AthleteId, default);
+
+        // Deficit
+        var activeDeficit = await Db.DeficitPhases.AsNoTracking()
+            .Where(d => d.UserId == AthleteId && d.Status == DeficitPhaseStatus.Active).FirstOrDefaultAsync();
+        _deficitStatus = activeDeficit?.Status.ToString();
+
+        // Goals
+        var goals = await Db.Goals.AsNoTracking().Include(g => g.Checkpoints)
+            .Where(g => g.UserId == AthleteId && g.Status == GoalStatus.Active).ToListAsync();
+        _goals = goals.Select(g =>
+        {
+            var current = g.Checkpoints.OrderByDescending(c => c.Date).FirstOrDefault()?.Value ?? g.StartValue;
+            return new GoalSummary(g.Title, g.Type.ToString(), g.TargetValue, current);
+        }).ToList();
+
+        _loading = false;
+    }
+
+    private void GoToPrograms() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}/programs");
+    private void GoToNotes() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}/notes");
+
+    private static Severity AlertSeverity(string s) => s switch
+    {
+        "Alert" => Severity.Error, "Warning" => Severity.Warning, _ => Severity.Info
+    };
+
+    private static Color WorkoutStatusColor(string s) => s switch
+    {
+        "Completed" => Color.Success, "InProgress" => Color.Warning, _ => Color.Default
+    };
+
+    private record WorkoutSummary(string Name, DateTimeOffset ScheduledAt, string Status, int SetCount);
+    private record GoalSummary(string Title, string Type, decimal? TargetValue, decimal? CurrentValue);
+}

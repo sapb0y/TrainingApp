@@ -1,0 +1,237 @@
+@page "/app/coach"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject ICoachAthleteService CoachService
+@inject ICoachAlertAggregatorService AlertService
+@inject ICurrentUserService CurrentUser
+@inject TrainingAppDbContext Db
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Coach Dashboard — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Coach">
+
+<PageHeader Title="Coach Dashboard" Subtitle="Your athletes at a glance">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="CreateInvite">Invite Athlete</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Summary Cards ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <StatCard Label="Athletes" Value="@_roster.Count.ToString()" Icon="@Icons.Material.Filled.Group" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="Need Attention" Value="@_needingAttention.ToString()" Icon="@Icons.Material.Filled.Warning"
+                      Subtitle="@(_needingAttention > 0 ? "alerts or warnings" : "all clear")" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="Total Alerts" Value="@_alerts.Count.ToString()" Icon="@Icons.Material.Filled.NotificationsActive" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="Pending Invites" Value="@_pendingInvites.ToString()" Icon="@Icons.Material.Filled.HourglassEmpty" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── Alerts ── *@
+    @if (_alerts.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Alerts</MudText>
+            @foreach (var a in _alerts.Take(10))
+            {
+                <MudAlert Severity="@AlertSeverity(a.Severity)" Dense="true" Class="mb-1" NoIcon="false">
+                    <b>@a.AthleteName</b> — @a.Message
+                </MudAlert>
+            }
+            @if (_alerts.Count > 10)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">+ @(_alerts.Count - 10) more alerts</MudText>
+            }
+        </MudPaper>
+    }
+
+    @* ── Roster Table ── *@
+    @if (_roster.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Athlete Roster</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>Athlete</th>
+                        <th>TSB</th>
+                        <th>Readiness</th>
+                        <th>Alerts</th>
+                        <th>Last Workout</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _roster)
+                    {
+                        <tr>
+                            <td><b>@r.Name</b></td>
+                            <td>
+                                @if (r.Tsb.HasValue)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="@TsbColor(r.Tsb.Value)">@r.Tsb.Value.ToString("F0")</MudChip>
+                                }
+                                else { <span>—</span> }
+                            </td>
+                            <td>@(r.Readiness ?? "—")</td>
+                            <td>
+                                @if (r.AlertCount > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">@r.AlertCount</MudChip>
+                                }
+                                else { <span>0</span> }
+                            </td>
+                            <td>@(r.LastWorkout?.ToString("MMM d") ?? "—")</td>
+                            <td>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                           OnClick="() => GoToAthlete(r.AthleteId)">View</MudButton>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+    else
+    {
+        <EmptyState Message="No athletes yet. Invite your first athlete!" Icon="@Icons.Material.Filled.GroupOff"
+                    ActionText="Invite Athlete" OnAction="CreateInvite" />
+    }
+
+    @* ── Pending Invites ── *@
+    @if (_invites.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4 mt-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Pending Invites</MudText>
+            @foreach (var inv in _invites)
+            {
+                <MudCard Elevation="0" Class="mb-2 pa-3" Style="border: 1px solid #1F1F2E;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.body1">Code: <b>@inv.InviteCode</b></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Created @inv.CreatedAt.LocalDateTime.ToString("MMM d")
+                                @if (inv.ExpiresAt.HasValue)
+                                {
+                                    <text> · Expires @inv.ExpiresAt.Value.LocalDateTime.ToString("MMM d")</text>
+                                }
+                            </MudText>
+                        </div>
+                    </div>
+                </MudCard>
+            }
+        </MudPaper>
+    }
+}
+
+</TierGate>
+
+@code {
+    private bool _loading = true;
+    private List<RosterItem> _roster = [];
+    private List<CoachAlertEngine.CoachAlert> _alerts = [];
+    private List<CoachAthlete> _invites = [];
+    private int _needingAttention;
+    private int _pendingInvites;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsCoach) { _loading = false; return; }
+
+        var coachId = CurrentUser.UserId;
+        var athletes = await CoachService.GetAthletesAsync(coachId, default);
+        _alerts = await AlertService.GetAlertsForAllAthletesAsync(coachId, default);
+
+        var alertsByAthlete = _alerts.GroupBy(a => a.AthleteId).ToDictionary(g => g.Key, g => g.ToList());
+        var athleteIds = athletes.Where(r => r.AthleteId.HasValue).Select(r => r.AthleteId!.Value).ToList();
+
+        _invites = athletes.Where(r => r.Status == CoachAthleteStatus.Pending).ToList();
+        _pendingInvites = _invites.Count;
+
+        var latestMetrics = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => athleteIds.Contains(m.UserId))
+            .GroupBy(m => m.UserId)
+            .Select(g => g.OrderByDescending(m => m.Date).First())
+            .ToDictionaryAsync(m => m.UserId);
+
+        var lastWorkouts = await Db.Workouts.AsNoTracking()
+            .Where(w => athleteIds.Contains(w.UserId) && w.Status == WorkoutStatus.Completed)
+            .GroupBy(w => w.UserId)
+            .Select(g => new { UserId = g.Key, Last = g.Max(w => w.CompletedAt) })
+            .ToDictionaryAsync(x => x.UserId, x => x.Last);
+
+        foreach (var rel in athletes.Where(r => r.AthleteId.HasValue && r.Status == CoachAthleteStatus.Active))
+        {
+            var aid = rel.AthleteId!.Value;
+            latestMetrics.TryGetValue(aid, out var metrics);
+            lastWorkouts.TryGetValue(aid, out var lastW);
+
+            string? readiness = null;
+            if (metrics?.ReadinessScore is not null)
+            {
+                readiness = metrics.ReadinessScore.Value switch
+                {
+                    >= 8m => "Excellent", >= 6m => "Good", >= 4m => "Moderate", >= 3m => "Poor", _ => "Very Poor"
+                };
+            }
+
+            var alertCount = alertsByAthlete.TryGetValue(aid, out var aa) ? aa.Count : 0;
+            _roster.Add(new RosterItem(aid, rel.Athlete?.DisplayName ?? "Unknown",
+                metrics?.Tsb, readiness, alertCount, lastW?.LocalDateTime));
+        }
+
+        _needingAttention = alertsByAthlete.Count(kv => kv.Value.Any(a => a.Severity is "Alert" or "Warning"));
+        _loading = false;
+    }
+
+    private async Task CreateInvite()
+    {
+        try
+        {
+            var rel = await CoachService.CreateInviteAsync(CurrentUser.UserId, default);
+            _invites.Add(rel);
+            _pendingInvites++;
+            Snackbar.Add($"Invite created: {rel.InviteCode}", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private void GoToAthlete(Guid id) => Nav.NavigateTo($"/app/coach/athlete/{id}");
+
+    private static Severity AlertSeverity(string s) => s switch
+    {
+        "Alert" => Severity.Error,
+        "Warning" => Severity.Warning,
+        _ => Severity.Info
+    };
+
+    private static Color TsbColor(decimal tsb)
+    {
+        if (tsb < -10) return Color.Error;
+        if (tsb < 0) return Color.Warning;
+        return Color.Success;
+    }
+
+    private record RosterItem(Guid AthleteId, string Name, decimal? Tsb, string? Readiness, int AlertCount, DateTime? LastWorkout);
+}

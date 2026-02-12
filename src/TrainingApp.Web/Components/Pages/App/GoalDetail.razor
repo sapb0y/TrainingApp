@@ -1,0 +1,204 @@
+@page "/app/goals/{GoalId:guid}"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IGoalTrackingService GoalService
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Goal — FitSpiralS</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_goal is null)
+{
+    <EmptyState Message="Goal not found" Icon="@Icons.Material.Filled.Error" />
+}
+else
+{
+    <PageHeader Title="@_goal.Title" Subtitle="@($"{_goal.Type} goal")">
+        <Actions>
+            @if (_goal.Status == GoalStatus.Active)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="MarkAchieved" Class="mr-2">Achieved</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Abandon" Class="mr-2">Abandon</MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="Delete">Delete</MudButton>
+        </Actions>
+    </PageHeader>
+
+    @* ── Progress ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <MudGrid Spacing="3">
+            <MudItem xs="6" sm="3">
+                <StatCard Label="START" Value="@(_goal.StartValue?.ToString("N1") ?? "—")" Unit="@_goal.TargetUnit" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="CURRENT" Value="@(_latestValue?.ToString("N1") ?? "—")" Unit="@_goal.TargetUnit" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="TARGET" Value="@(_goal.TargetValue?.ToString("N1") ?? "—")" Unit="@_goal.TargetUnit" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="PROGRESS" Value="@_progress.ToString("N0")" Unit="%" />
+            </MudItem>
+        </MudGrid>
+
+        @if (_goal.TargetValue.HasValue)
+        {
+            <MudProgressLinear Value="@_progress" Color="Color.Primary" Size="Size.Large" Class="mt-3" />
+        }
+
+        @if (_goal.TargetDate.HasValue)
+        {
+            var daysLeft = _goal.TargetDate.Value.DayNumber - DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                @(daysLeft > 0 ? $"{daysLeft} days remaining" : "Target date passed")
+                — @_goal.TargetDate.Value.ToString("MMM d, yyyy")
+            </MudText>
+        }
+    </MudPaper>
+
+    @* ── Checkpoint Chart ── *@
+    @if (_checkpoints.Count >= 2)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Progress Over Time</MudText>
+            <MudChart ChartType="ChartType.Line" ChartSeries="@_chartSeries"
+                      XAxisLabels="@_chartLabels" Width="100%" Height="250px"
+                      ChartOptions="new ChartOptions { LineStrokeWidth = 2 }" />
+        </MudPaper>
+    }
+
+    @* ── Add Checkpoint ── *@
+    @if (_goal.Status == GoalStatus.Active)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Add Checkpoint</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="4">
+                    <MudNumericField T="decimal" @bind-Value="_cpValue" Label="Value" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="4">
+                    <MudDatePicker Label="Date" @bind-Date="_cpDate" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="4" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddCheckpoint">Add</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @* ── Checkpoint History ── *@
+    @if (_checkpoints.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Checkpoints</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr><th>Date</th><th>Value</th><th>% Complete</th><th>Notes</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var cp in _checkpoints.OrderByDescending(c => c.Date))
+                    {
+                        <tr>
+                            <td>@cp.Date.ToString("MMM d")</td>
+                            <td><b>@cp.Value.ToString("N1")</b> @(_goal.TargetUnit ?? "")</td>
+                            <td>@(cp.PercentComplete?.ToString("N0") ?? "—")%</td>
+                            <td>@(cp.Notes ?? "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public Guid GoalId { get; set; }
+
+    private bool _loading = true;
+    private Goal? _goal;
+    private List<GoalCheckpoint> _checkpoints = [];
+    private decimal? _latestValue;
+    private double _progress;
+
+    // Add checkpoint form
+    private decimal _cpValue;
+    private DateTime? _cpDate = DateTime.Today;
+
+    // Chart
+    private List<ChartSeries> _chartSeries = [];
+    private string[] _chartLabels = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _goal = await GoalService.GetGoalAsync(CurrentUser.UserId, GoalId, default);
+        if (_goal is not null)
+        {
+            _checkpoints = await GoalService.GetCheckpointsAsync(CurrentUser.UserId, GoalId, default);
+            _latestValue = _checkpoints.OrderByDescending(c => c.Date).FirstOrDefault()?.Value ?? _goal.StartValue;
+            _progress = CalcProgress();
+            BuildChart();
+        }
+        _loading = false;
+    }
+
+    private double CalcProgress()
+    {
+        if (_goal is null || !_goal.TargetValue.HasValue || !_goal.StartValue.HasValue || _goal.TargetValue == _goal.StartValue)
+            return 0;
+        var total = _goal.TargetValue.Value - _goal.StartValue.Value;
+        var current = (_latestValue ?? _goal.StartValue.Value) - _goal.StartValue.Value;
+        return Math.Clamp((double)(current / total * 100), 0, 100);
+    }
+
+    private void BuildChart()
+    {
+        if (_checkpoints.Count < 2) return;
+        var ordered = _checkpoints.OrderBy(c => c.Date).ToList();
+        _chartLabels = ordered.Select(c => c.Date.ToString("M/d")).ToArray();
+        _chartSeries = [new ChartSeries { Name = "Value", Data = ordered.Select(c => (double)c.Value).ToArray() }];
+    }
+
+    private async Task AddCheckpoint()
+    {
+        if (_goal is null) return;
+        var date = _cpDate.HasValue ? DateOnly.FromDateTime(_cpDate.Value) : DateOnly.FromDateTime(DateTime.Today);
+        await GoalService.AddCheckpointAsync(CurrentUser.UserId, GoalId, date, _cpValue, null, default);
+
+        _checkpoints = await GoalService.GetCheckpointsAsync(CurrentUser.UserId, GoalId, default);
+        _latestValue = _checkpoints.OrderByDescending(c => c.Date).FirstOrDefault()?.Value;
+        _progress = CalcProgress();
+        BuildChart();
+        Snackbar.Add("Checkpoint added", Severity.Success);
+    }
+
+    private async Task MarkAchieved()
+    {
+        if (_goal is null) return;
+        await GoalService.UpdateGoalAsync(CurrentUser.UserId, GoalId, GoalStatus.Achieved, null, null, null, default);
+        _goal.Status = GoalStatus.Achieved;
+        Snackbar.Add("Goal achieved!", Severity.Success);
+    }
+
+    private async Task Abandon()
+    {
+        if (_goal is null) return;
+        await GoalService.UpdateGoalAsync(CurrentUser.UserId, GoalId, GoalStatus.Abandoned, null, null, null, default);
+        _goal.Status = GoalStatus.Abandoned;
+        Snackbar.Add("Goal abandoned", Severity.Info);
+    }
+
+    private async Task Delete()
+    {
+        if (_goal is null) return;
+        await GoalService.DeleteGoalAsync(CurrentUser.UserId, GoalId, default);
+        Nav.NavigateTo("/app/goals");
+    }
+}

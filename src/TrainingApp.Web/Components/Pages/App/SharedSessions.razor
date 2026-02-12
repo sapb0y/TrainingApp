@@ -1,0 +1,154 @@
+@page "/app/sessions"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject ISharedSessionService SessionService
+@inject IPartnershipService PartnerService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Shared Sessions — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Shared Sessions" Subtitle="Train together with your partner">
+    <Actions>
+        @if (_partnership is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="() => _showCreate = true">New Session</MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_partnership is null)
+{
+    <EmptyState Message="You need an active partnership to create shared sessions"
+                Icon="@Icons.Material.Filled.GroupOff"
+                ActionText="Find a Partner" OnAction="GoToPartners" />
+}
+else if (!_sessions.Any())
+{
+    <EmptyState Message="No shared sessions yet. Plan a workout together!"
+                Icon="@Icons.Material.Filled.Event"
+                ActionText="New Session" OnAction="() => _showCreate = true" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var s in _sessions.OrderByDescending(s => s.ScheduledDate))
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                    <MudCardContent>
+                        <div class="d-flex align-center justify-space-between mb-2">
+                            <MudText Typo="Typo.subtitle1"><b>@s.ScheduledDate.ToString("ddd, MMM d")</b></MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@SessionStatusColor(s.Status)">@s.Status</MudChip>
+                        </div>
+                        @if (s.EstimatedDurationMinutes.HasValue)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                ~@s.EstimatedDurationMinutes min
+                            </MudText>
+                        }
+                        @if (s.Slots.Any())
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@s.Slots.Count slots scheduled</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(s.Notes))
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-1">@s.Notes</MudText>
+                        }
+                        <div class="d-flex gap-2 mt-2">
+                            @if (s.Status == SharedSessionStatus.Planned)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="() => GenerateSchedule(s)">Generate Schedule</MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                                           OnClick="() => Cancel(s)">Cancel</MudButton>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+</TierGate>
+
+@* ── Create Dialog ── *@
+<MudDialog @bind-Visible="_showCreate">
+    <DialogContent>
+        <MudDatePicker Label="Date" @bind-Date="_newDate" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_newNotes" Label="Notes" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCreate = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private bool _loading = true;
+    private Partnership? _partnership;
+    private List<SharedSession> _sessions = [];
+    private bool _showCreate;
+    private DateTime? _newDate = DateTime.Today;
+    private string? _newNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _partnership = await PartnerService.GetActivePartnershipAsync(CurrentUser.UserId, default);
+        if (_partnership is not null)
+            _sessions = await SessionService.GetSessionsAsync(CurrentUser.UserId, _partnership.Id, default);
+        _loading = false;
+    }
+
+    private void GoToPartners() => Nav.NavigateTo("/app/partners");
+
+    private async Task Create()
+    {
+        if (_partnership is null) return;
+        var date = _newDate.HasValue ? DateOnly.FromDateTime(_newDate.Value) : DateOnly.FromDateTime(DateTime.Today);
+        await SessionService.CreateSessionAsync(CurrentUser.UserId, _partnership.Id, date, null, null, _newNotes, default);
+        _sessions = await SessionService.GetSessionsAsync(CurrentUser.UserId, _partnership.Id, default);
+        _showCreate = false;
+        Snackbar.Add("Session created", Severity.Success);
+    }
+
+    private async Task GenerateSchedule(SharedSession session)
+    {
+        try
+        {
+            await SessionService.GenerateScheduleAsync(CurrentUser.UserId, session.Id, default);
+            _sessions = await SessionService.GetSessionsAsync(CurrentUser.UserId, _partnership!.Id, default);
+            Snackbar.Add("Schedule generated", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task Cancel(SharedSession session)
+    {
+        await SessionService.CancelSessionAsync(CurrentUser.UserId, session.Id, default);
+        _sessions = await SessionService.GetSessionsAsync(CurrentUser.UserId, _partnership!.Id, default);
+        Snackbar.Add("Session cancelled", Severity.Info);
+    }
+
+    private static Color SessionStatusColor(SharedSessionStatus s) => s switch
+    {
+        SharedSessionStatus.Planned => Color.Info,
+        SharedSessionStatus.InProgress => Color.Warning,
+        SharedSessionStatus.Completed => Color.Success,
+        SharedSessionStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+}

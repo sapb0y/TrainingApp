@@ -1,0 +1,200 @@
+@page "/app/weight"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@attribute [Authorize]
+@inject IWeightTrackingService WeightService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Weight — FitSpiralS</PageTitle>
+
+<PageHeader Title="Body Weight" Subtitle="Track weight and monitor trends">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="() => _showLog = true">Log Weight</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Stats ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <StatCard Label="CURRENT" Value="@(_latest?.WeightKg.ToString("N1") ?? "—")" Unit="kg"
+                      Icon="@Icons.Material.Filled.Scale" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="7D AVERAGE" Value="@(_latest?.MovingAverage7d?.ToString("N1") ?? "—")" Unit="kg"
+                      Icon="@Icons.Material.Filled.TrendingFlat" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="30D AVERAGE" Value="@(_latest?.MovingAverage30d?.ToString("N1") ?? "—")" Unit="kg"
+                      Icon="@Icons.Material.Filled.Timeline" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="WEEKLY RATE" Value="@(_latest?.WeeklyRateKg?.ToString("N2") ?? "—")" Unit="kg/wk"
+                      Subtitle="@_trend"
+                      Icon="@Icons.Material.Filled.Speed" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── Chart (simple line using MudBlazor) ── *@
+    @if (_history.Count >= 2)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Weight Trend (@_rangeDays days)</MudText>
+            <MudChart ChartType="ChartType.Line" ChartSeries="@_chartSeries"
+                      XAxisLabels="@_chartLabels" Width="100%" Height="300px"
+                      ChartOptions="_chartOptions" />
+        </MudPaper>
+    }
+
+    @* ── History Table ── *@
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+        <div class="d-flex align-center justify-space-between mb-3">
+            <MudText Typo="Typo.h6">History</MudText>
+            <MudSelect T="int" Value="_rangeDays" ValueChanged="OnRangeChanged"
+                       Variant="Variant.Outlined" Style="max-width:150px">
+                <MudSelectItem T="int" Value="30">30 days</MudSelectItem>
+                <MudSelectItem T="int" Value="60">60 days</MudSelectItem>
+                <MudSelectItem T="int" Value="90">90 days</MudSelectItem>
+                <MudSelectItem T="int" Value="180">180 days</MudSelectItem>
+            </MudSelect>
+        </div>
+
+        @if (!_history.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No weight entries yet.</MudText>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Weight</th>
+                        <th>7d Avg</th>
+                        <th>Weekly Rate</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in _history.OrderByDescending(w => w.Date))
+                    {
+                        <tr>
+                            <td>@w.Date.ToString("MMM d")</td>
+                            <td><b>@w.WeightKg.ToString("N1")</b> kg</td>
+                            <td>@(w.MovingAverage7d?.ToString("N1") ?? "—")</td>
+                            <td>@(w.WeeklyRateKg?.ToString("N2") ?? "—") kg/wk</td>
+                            <td>@(w.Notes ?? "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+}
+
+@* ── Log Dialog ── *@
+<MudDialog @bind-Visible="_showLog">
+    <DialogContent>
+        <MudNumericField T="decimal" @bind-Value="_logWeight" Label="Weight (kg)" Variant="Variant.Outlined"
+                         Min="20m" Max="300m" Step="0.1m" Class="mb-3" />
+        <MudDatePicker Label="Date" @bind-Date="_logDate" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_logNotes" Label="Notes (optional)" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showLog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitLog">Log</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private WeightLog? _latest;
+    private List<WeightLog> _history = [];
+    private string? _trend;
+    private int _rangeDays = 30;
+
+    // Log form
+    private bool _showLog;
+    private decimal _logWeight = 80;
+    private DateTime? _logDate = DateTime.Today;
+    private string? _logNotes;
+
+    // Chart
+    private List<ChartSeries> _chartSeries = [];
+    private string[] _chartLabels = [];
+    private ChartOptions _chartOptions = new() { LineStrokeWidth = 2 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _latest = await WeightService.GetLatestWeightAsync(CurrentUser.UserId);
+        if (_latest is not null) _logWeight = _latest.WeightKg;
+
+        _trend = DetectTrend();
+        await LoadHistory();
+        _loading = false;
+    }
+
+    private async Task LoadHistory()
+    {
+        var from = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-_rangeDays);
+        var to = DateOnly.FromDateTime(DateTime.UtcNow);
+        _history = await WeightService.GetWeightHistoryAsync(CurrentUser.UserId, from, to);
+        BuildChart();
+    }
+
+    private void BuildChart()
+    {
+        if (_history.Count < 2) return;
+        var ordered = _history.OrderBy(w => w.Date).ToList();
+        _chartLabels = ordered.Select(w => w.Date.ToString("M/d")).ToArray();
+        _chartSeries =
+        [
+            new ChartSeries { Name = "Weight", Data = ordered.Select(w => (double)w.WeightKg).ToArray() },
+        ];
+        if (ordered.Any(w => w.MovingAverage7d.HasValue))
+        {
+            _chartSeries.Add(new ChartSeries
+            {
+                Name = "7d Avg",
+                Data = ordered.Select(w => (double)(w.MovingAverage7d ?? w.WeightKg)).ToArray()
+            });
+        }
+    }
+
+    private async Task OnRangeChanged(int days)
+    {
+        _rangeDays = days;
+        await LoadHistory();
+    }
+
+    private async Task SubmitLog()
+    {
+        var date = _logDate.HasValue ? DateOnly.FromDateTime(_logDate.Value) : DateOnly.FromDateTime(DateTime.Today);
+        _latest = await WeightService.LogWeightAsync(CurrentUser.UserId, date, _logWeight, _logNotes);
+        _showLog = false;
+        _trend = DetectTrend();
+        await LoadHistory();
+        Snackbar.Add("Weight logged", Severity.Success);
+    }
+
+    private string? DetectTrend()
+    {
+        if (_latest?.WeeklyRateKg is null) return null;
+        return _latest.WeeklyRateKg.Value switch
+        {
+            > 0.1m => "Gaining",
+            < -0.1m => "Losing",
+            _ => "Stable"
+        };
+    }
+}

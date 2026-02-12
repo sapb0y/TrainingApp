@@ -1,0 +1,212 @@
+@page "/app/charts"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject IFatigueModelService FatigueService
+
+<PageTitle>Charts — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Charts" Subtitle="Visualize your training data" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Chart Type Selector ── *@
+    <MudChipSet T="string" SelectedValue="_activeChart" SelectedValueChanged="OnChartChanged" Class="mb-4">
+        <MudChip T="string" Value="@("strength")" Color="Color.Primary">Strength</MudChip>
+        <MudChip T="string" Value="@("weight")" Color="Color.Primary">Weight</MudChip>
+        <MudChip T="string" Value="@("volume")" Color="Color.Primary">Volume</MudChip>
+        <MudChip T="string" Value="@("cardio")" Color="Color.Primary">Cardio</MudChip>
+        <MudChip T="string" Value="@("fatigue")" Color="Color.Primary">Fatigue</MudChip>
+    </MudChipSet>
+
+    <ChartCard Title="@_chartTitle" SelectedDays="_rangeDays" SelectedDaysChanged="OnRangeChanged">
+        @if (_chartSeries.Count > 0 && _chartLabels.Length > 0)
+        {
+            <MudChart ChartType="ChartType.Line" ChartSeries="@_chartSeries"
+                      XAxisLabels="@_chartLabels" Width="100%" Height="350px"
+                      ChartOptions="_chartOptions" />
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+                Not enough data for this chart. Keep training!
+            </MudText>
+        }
+    </ChartCard>
+
+    @* ── Stats Summary ── *@
+    @if (_stats is not null)
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="6" sm="3">
+                <StatCard Label="MIN" Value="@_stats.Min.ToString("N1")" Unit="@_statsUnit" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="MAX" Value="@_stats.Max.ToString("N1")" Unit="@_statsUnit" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="AVERAGE" Value="@_stats.Average.ToString("N1")" Unit="@_statsUnit" />
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <StatCard Label="CHANGE" Value="@(_stats.ChangePercent?.ToString("N1") ?? "—")" Unit="%"
+                          Change="@_stats.ChangePercent" />
+            </MudItem>
+        </MudGrid>
+    }
+}
+
+</TierGate>
+
+@code {
+    private bool _loading = true;
+    private string _activeChart = "strength";
+    private string _chartTitle = "Strength Progression";
+    private int _rangeDays = 30;
+    private List<ChartSeries> _chartSeries = [];
+    private string[] _chartLabels = [];
+    private ChartOptions _chartOptions = new() { LineStrokeWidth = 2 };
+    private ChartDataService.ChartStatistics? _stats;
+    private string _statsUnit = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadChart();
+        _loading = false;
+    }
+
+    private async Task OnChartChanged(string chart)
+    {
+        _activeChart = chart;
+        await LoadChart();
+    }
+
+    private async Task OnRangeChanged(int days)
+    {
+        _rangeDays = days;
+        await LoadChart();
+    }
+
+    private async Task LoadChart()
+    {
+        var userId = CurrentUser.UserId;
+        var to = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = to.AddDays(-_rangeDays);
+
+        _chartSeries = [];
+        _chartLabels = [];
+        _stats = null;
+
+        switch (_activeChart)
+        {
+            case "strength":
+                _chartTitle = "Strength Progression (Top e1RM)";
+                _statsUnit = "kg";
+                await LoadStrength(userId, from, to);
+                break;
+            case "weight":
+                _chartTitle = "Body Weight";
+                _statsUnit = "kg";
+                await LoadWeight(userId, from, to);
+                break;
+            case "volume":
+                _chartTitle = "Training Volume";
+                _statsUnit = "kg";
+                await LoadVolume(userId, from, to);
+                break;
+            case "cardio":
+                _chartTitle = "Cardio (TRIMP)";
+                _statsUnit = "TRIMP";
+                await LoadCardio(userId, from, to);
+                break;
+            case "fatigue":
+                _chartTitle = "Training Load (CTL / ATL / TSB)";
+                _statsUnit = "";
+                await LoadFatigue(userId, from, to);
+                break;
+        }
+    }
+
+    private async Task LoadStrength(Guid userId, DateOnly from, DateOnly to)
+    {
+        var sets = await Db.WorkoutSets.AsNoTracking().Include(s => s.Workout)
+            .Where(s => s.Workout!.UserId == userId && !s.IsWarmup
+                && s.ActualWeight != null && s.ActualReps != null && s.ActualReps >= 1 && s.ActualReps <= 30
+                && s.Workout!.CompletedAt != null
+                && DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime) >= from)
+            .Select(s => new { Date = DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime),
+                E1rm = s.ActualWeight!.Value * (1 + s.ActualReps!.Value / 30m) })
+            .ToListAsync();
+
+        var daily = sets.GroupBy(s => s.Date).Select(g => (g.Key, g.Max(s => s.E1rm))).OrderBy(d => d.Key).ToList();
+        if (daily.Count < 2) return;
+
+        var chart = ChartDataService.BuildStrengthProgressionChart(daily);
+        _chartLabels = chart.Series.Points.Select(p => p.Date.ToString("M/d")).ToArray();
+        _chartSeries = [new ChartSeries { Name = chart.Series.Name, Data = chart.Series.Points.Select(p => (double)p.Value).ToArray() }];
+        _stats = chart.Statistics;
+    }
+
+    private async Task LoadWeight(Guid userId, DateOnly from, DateOnly to)
+    {
+        var logs = await Db.WeightLogs.AsNoTracking()
+            .Where(w => w.UserId == userId && w.Date >= from).OrderBy(w => w.Date).ToListAsync();
+        if (logs.Count < 2) return;
+
+        var chart = ChartDataService.BuildBodyWeightChart(
+            logs.Select(w => (w.Date, w.WeightKg, w.MovingAverage7d, w.MovingAverage30d)));
+        _chartLabels = chart.Series[0].Points.Select(p => p.Date.ToString("M/d")).ToArray();
+        _chartSeries = chart.Series.Select(s => new ChartSeries { Name = s.Name, Data = s.Points.Select(p => (double)p.Value).ToArray() }).ToList();
+        if (chart.Series.Count > 0) _stats = new ChartDataService.ChartStatistics(
+            logs.Min(l => l.WeightKg), logs.Max(l => l.WeightKg), logs.Average(l => l.WeightKg),
+            logs.Last().WeightKg, logs.Count >= 2 ? Math.Round((logs.Last().WeightKg - logs.First().WeightKg) / logs.First().WeightKg * 100, 1) : null);
+    }
+
+    private async Task LoadVolume(Guid userId, DateOnly from, DateOnly to)
+    {
+        var metrics = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == userId && m.Date >= from).OrderBy(m => m.Date).ToListAsync();
+        if (metrics.Count < 2) return;
+
+        var chart = ChartDataService.BuildVolumeChart(
+            metrics.Select(m => (m.Date, m.TotalVolume, m.TotalSets)));
+        _chartLabels = chart.Series[0].Points.Select(p => p.Date.ToString("M/d")).ToArray();
+        _chartSeries = chart.Series.Select(s => new ChartSeries { Name = s.Name, Data = s.Points.Select(p => (double)p.Value).ToArray() }).ToList();
+    }
+
+    private async Task LoadCardio(Guid userId, DateOnly from, DateOnly to)
+    {
+        var sessions = await Db.CardioSessions.AsNoTracking()
+            .Where(c => c.UserId == userId && c.Date >= from).OrderBy(c => c.Date).ToListAsync();
+        if (sessions.Count < 2) return;
+
+        var chart = ChartDataService.BuildCardioChart(
+            sessions.Select(c => (c.Date, c.DurationMinutes, c.DistanceKm, c.CardioTrimp ?? 0)));
+        _chartLabels = chart.Series[0].Points.Select(p => p.Date.ToString("M/d")).ToArray();
+        _chartSeries = chart.Series.Select(s => new ChartSeries { Name = s.Name, Data = s.Points.Select(p => (double)p.Value).ToArray() }).ToList();
+    }
+
+    private async Task LoadFatigue(Guid userId, DateOnly from, DateOnly to)
+    {
+        var history = await FatigueService.GetHistoryAsync(userId, from, to);
+        if (history.Count < 2) return;
+
+        var ordered = history.OrderBy(h => h.Date).ToList();
+        var chart = ChartDataService.BuildFatigueChart(
+            ordered.Select(h => (h.Date, h.Ctl, h.Atl, h.Tsb)));
+        _chartLabels = chart.Series[0].Points.Select(p => p.Date.ToString("M/d")).ToArray();
+        _chartSeries = chart.Series.Select(s => new ChartSeries { Name = s.Name, Data = s.Points.Select(p => (double)p.Value).ToArray() }).ToList();
+    }
+}

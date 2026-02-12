@@ -1,0 +1,103 @@
+@inherits LayoutComponentBase
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Entities
+
+<MudThemeProvider Theme="AppTheme.Default" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Dense="true" Style="background: #0A0A0F; border-bottom: 1px solid #1F1F2E;">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit"
+                       Edge="Edge.Start" OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h6" Style="background: linear-gradient(135deg, #7C3AED, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <a href="/" style="text-decoration:none; background: inherit; -webkit-background-clip: text; -webkit-text-fill-color: transparent;">FitSpiralS</a>
+        </MudText>
+        <MudSpacer />
+        <MudTooltip Text="Logout">
+            <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit" Href="/logout" />
+        </MudTooltip>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" ClipMode="DrawerClipMode.Always"
+               Variant="DrawerVariant.Mini" OpenMiniOnHover="true"
+               Style="border-right: 1px solid #1F1F2E;">
+        <MudNavMenu>
+            <MudNavLink Href="/app/dashboard" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+
+            <MudNavGroup Title="Training" Icon="@Icons.Material.Filled.FitnessCenter" Expanded="true">
+                <MudNavLink Href="/app/workouts" Icon="@Icons.Material.Filled.PlaylistAddCheck">Workouts</MudNavLink>
+                <MudNavLink Href="/app/exercises" Icon="@Icons.Material.Filled.Search">Exercises</MudNavLink>
+                @if (CurrentUser.Tier >= SubscriptionTier.Competitor)
+                {
+                    <MudNavLink Href="/app/programs" Icon="@Icons.Material.Filled.EventNote">Programs</MudNavLink>
+                }
+                else
+                {
+                    <MudNavLink Href="/app/programs" Icon="@Icons.Material.Filled.Lock" IconColor="Color.Warning">Programs</MudNavLink>
+                }
+            </MudNavGroup>
+
+            <MudNavGroup Title="Body" Icon="@Icons.Material.Filled.MonitorWeight">
+                <MudNavLink Href="/app/weight" Icon="@Icons.Material.Filled.Scale">Weight</MudNavLink>
+                <MudNavLink Href="/app/cardio" Icon="@Icons.Material.Filled.DirectionsRun">Cardio</MudNavLink>
+                <MudNavLink Href="/app/fatigue" Icon="@Icons.Material.Filled.Battery3Bar">Fatigue</MudNavLink>
+                <MudNavLink Href="/app/training-day" Icon="@Icons.Material.Filled.Today">Training Day</MudNavLink>
+                <MudNavLink Href="/app/deficit" Icon="@Icons.Material.Filled.TrendingDown">Deficit</MudNavLink>
+                <MudNavLink Href="/app/metabolism" Icon="@Icons.Material.Filled.LocalFireDepartment">Metabolism</MudNavLink>
+                <MudNavLink Href="/app/neat" Icon="@Icons.Material.Filled.DirectionsWalk">NEAT</MudNavLink>
+            </MudNavGroup>
+
+            @if (CurrentUser.Tier >= SubscriptionTier.Competitor)
+            {
+                <MudNavGroup Title="Analytics" Icon="@Icons.Material.Filled.Insights">
+                    <MudNavLink Href="/app/charts" Icon="@Icons.Material.Filled.BarChart">Charts</MudNavLink>
+                    <MudNavLink Href="/app/goals" Icon="@Icons.Material.Filled.Flag">Goals</MudNavLink>
+                    <MudNavLink Href="/app/insights" Icon="@Icons.Material.Filled.Lightbulb">Insights</MudNavLink>
+                </MudNavGroup>
+
+                <MudNavGroup Title="Social" Icon="@Icons.Material.Filled.Group">
+                    <MudNavLink Href="/app/partners" Icon="@Icons.Material.Filled.Handshake">Partners</MudNavLink>
+                    <MudNavLink Href="/app/sessions" Icon="@Icons.Material.Filled.Event">Sessions</MudNavLink>
+                </MudNavGroup>
+            }
+            else
+            {
+                <MudNavGroup Title="Analytics" Icon="@Icons.Material.Filled.Lock" IconColor="Color.Warning">
+                    <MudNavLink Href="/app/charts" Icon="@Icons.Material.Filled.Lock" IconColor="Color.Warning">Charts</MudNavLink>
+                    <MudNavLink Href="/app/goals" Icon="@Icons.Material.Filled.Lock" IconColor="Color.Warning">Goals</MudNavLink>
+                </MudNavGroup>
+            }
+
+            @if (CurrentUser.IsCoach)
+            {
+                <MudNavGroup Title="Coach" Icon="@Icons.Material.Filled.School">
+                    <MudNavLink Href="/app/coach" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                    <MudNavLink Href="/app/coach-application" Icon="@Icons.Material.Filled.Info">Application</MudNavLink>
+                </MudNavGroup>
+            }
+            else
+            {
+                <MudNavLink Href="/app/coach-application" Icon="@Icons.Material.Filled.School">Become a Coach</MudNavLink>
+            }
+
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/app/subscription" Icon="@Icons.Material.Filled.CreditCard">Subscription</MudNavLink>
+            <MudNavLink Href="/app/export" Icon="@Icons.Material.Filled.Download">Export</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent Style="min-height: 100vh; padding: 24px;">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+}

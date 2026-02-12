@@ -1,0 +1,175 @@
+@page "/app/metabolism"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject IWeightTrackingService WeightService
+@inject IDeficitPhaseService DeficitService
+
+<PageTitle>Metabolism — FitSpiralS</PageTitle>
+
+<PageHeader Title="Metabolism" Subtitle="BMR, TDEE, adaptation tracking and projections" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_user?.Settings.Sex is null || _user.Settings.HeightCm is null || _user.Settings.DateOfBirth is null)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        Complete your profile (sex, height, date of birth) to see metabolism estimates.
+    </MudAlert>
+}
+else
+{
+    @* ── Core Metrics ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <StatCard Label="BMR" Value="@_bmr?.BmrKcal.ToString("N0")" Unit="kcal"
+                      Icon="@Icons.Material.Filled.LocalFireDepartment"
+                      Subtitle="@_bmr?.Formula" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="TDEE" Value="@_tdee?.TdeeKcal.ToString("N0")" Unit="kcal"
+                      Icon="@Icons.Material.Filled.DirectionsRun"
+                      Subtitle="@($"×{_tdee?.ActivityMultiplier:N2} ({_user.Settings.ActivityLevel})")" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="ADAPTED TDEE" Value="@(_adaptation?.AdaptedTdeeKcal.ToString("N0") ?? _tdee?.TdeeKcal.ToString("N0"))" Unit="kcal"
+                      Subtitle="@(_adaptation is not null ? $"-{_adaptation.AdaptationPercent:N1}% adaptation" : "No adaptation")" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="INTAKE TARGET" Value="@(_intake?.TargetKcal.ToString("N0") ?? "—")" Unit="kcal"
+                      Subtitle="@(_intake is not null ? $"-{_intake.DeficitKcal:N0} kcal deficit" : "Not in deficit")" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── NEAT Compensation ── *@
+    @if (_neatComp is not null)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">NEAT Compensation</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Baseline NEAT</MudText>
+                    <MudText Typo="Typo.body1">@_neatComp.BaselineNeatKcal.ToString("N0") kcal</MudText>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Current NEAT</MudText>
+                    <MudText Typo="Typo.body1">@_neatComp.CurrentNeatKcal.ToString("N0") kcal</MudText>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Compensation</MudText>
+                    <MudText Typo="Typo.body1" Color="@(_neatComp.CompensationPercent > 10 ? Color.Warning : Color.Success)">
+                        @_neatComp.CompensationPercent.ToString("N1")%
+                    </MudText>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Lost kcal</MudText>
+                    <MudText Typo="Typo.body1">@_neatComp.CompensationKcal.ToString("N0") kcal/day</MudText>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @* ── Weight Projections ── *@
+    @if (_projections.Count > 0)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Weight Projection</MudText>
+            <MudChart ChartType="ChartType.Line" ChartSeries="@_projectionSeries"
+                      XAxisLabels="@_projectionLabels" Width="100%" Height="250px"
+                      ChartOptions="new ChartOptions { LineStrokeWidth = 2 }" />
+        </MudPaper>
+    }
+
+    @* ── Alerts ── *@
+    @if (_alerts.Count > 0)
+    {
+        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Alerts</MudText>
+            @foreach (var alert in _alerts)
+            {
+                <MudAlert Severity="@alert.Severity" Dense="true" Class="mb-2">@alert.Message</MudAlert>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private User? _user;
+    private MetabolicCalculatorService.BmrResult? _bmr;
+    private MetabolicCalculatorService.TdeeResult? _tdee;
+    private MetabolicCalculatorService.AdaptationResult? _adaptation;
+    private MetabolicCalculatorService.NeatCompensation? _neatComp;
+    private MetabolicCalculatorService.IntakeTarget? _intake;
+    private List<MetabolicCalculatorService.WeightProjection> _projections = [];
+    private List<ChartSeries> _projectionSeries = [];
+    private string[] _projectionLabels = [];
+    private List<AlertItem> _alerts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == CurrentUser.UserId);
+        if (_user?.Settings.Sex is null || _user.Settings.HeightCm is null || _user.Settings.DateOfBirth is null)
+        {
+            _loading = false;
+            return;
+        }
+
+        var age = DateTime.UtcNow.Year - _user.Settings.DateOfBirth.Value.Year;
+        var latestWeight = await WeightService.GetLatestWeightAsync(CurrentUser.UserId);
+        var weight = latestWeight?.WeightKg ?? 70m;
+
+        _bmr = MetabolicCalculatorService.CalculateBmr(_user.Settings.Sex.Value, weight, _user.Settings.HeightCm.Value, age);
+        _tdee = MetabolicCalculatorService.CalculateTdee(_bmr.BmrKcal, _user.Settings.ActivityLevel);
+
+        var deficit = await DeficitService.GetActiveDeficitAsync(CurrentUser.UserId);
+        if (deficit is not null)
+        {
+            var weeks = (DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - deficit.StartDate.DayNumber) / 7;
+            _adaptation = MetabolicCalculatorService.EstimateAdaptation(_tdee.TdeeKcal, weight, deficit.StartWeightKg, weeks);
+            _intake = MetabolicCalculatorService.CalculateIntakeTarget(_adaptation.AdaptedTdeeKcal, deficit.WeeklyRateKg, _bmr.BmrKcal);
+            _projections = MetabolicCalculatorService.ProjectWeight(weight, -deficit.WeeklyRateKg, 12);
+
+            if (_projections.Count >= 2)
+            {
+                _projectionLabels = _projections.Select(p => p.Date.ToString("M/d")).ToArray();
+                _projectionSeries = [new ChartSeries { Name = "Projected Weight", Data = _projections.Select(p => (double)p.ProjectedWeightKg).ToArray() }];
+            }
+
+            // Alerts
+            if (_adaptation.AdaptationPercent > 12)
+                _alerts.Add(new("Significant metabolic adaptation detected. Consider a diet break.", Severity.Warning));
+            if (_intake.TargetKcal <= _bmr.BmrKcal)
+                _alerts.Add(new("Intake at BMR floor. Cannot reduce further without health risks.", Severity.Error));
+        }
+
+        // NEAT from recent logs
+        var recentNeat = await Db.NeatLogs.AsNoTracking()
+            .Where(n => n.UserId == CurrentUser.UserId)
+            .OrderByDescending(n => n.Date)
+            .Take(7)
+            .ToListAsync();
+
+        if (recentNeat.Count > 0)
+        {
+            var avgSteps = (int)recentNeat.Average(n => n.StepCount);
+            _neatComp = MetabolicCalculatorService.EstimateNeatCompensation(avgSteps);
+
+            if (_neatComp.CompensationPercent > 20)
+                _alerts.Add(new("NEAT significantly reduced — try to increase daily steps.", Severity.Warning));
+        }
+
+        _loading = false;
+    }
+
+    private sealed record AlertItem(string Message, Severity Severity);
+}

@@ -1,0 +1,214 @@
+@page "/app/subscription"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject ISubscriptionService SubService
+@inject IPaymentService PaymentService
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Subscription — FitSpiralS</PageTitle>
+
+<PageHeader Title="Subscription" Subtitle="Manage your plan" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_sub is null)
+{
+    <EmptyState Message="No subscription found" Icon="@Icons.Material.Filled.CreditCard" />
+}
+else
+{
+    @* ── Current Plan ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">CURRENT PLAN</MudText>
+                <MudText Typo="Typo.h4" Color="Color.Primary">@_sub.Tier</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@StatusColor(_sub.Status)" Class="mt-1">@_sub.Status</MudChip>
+                @if (_sub.Interval == BillingInterval.Annual)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="mt-1">Annual</MudChip>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Started</MudText>
+                        <MudText Typo="Typo.body1">@_sub.StartDate.LocalDateTime.ToString("MMM d, yyyy")</MudText>
+                    </MudItem>
+                    @if (_sub.CurrentPeriodEnd.HasValue)
+                    {
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Renews</MudText>
+                            <MudText Typo="Typo.body1">@_sub.CurrentPeriodEnd.Value.LocalDateTime.ToString("MMM d, yyyy")</MudText>
+                        </MudItem>
+                    }
+                    @if (_trialDays.HasValue)
+                    {
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Trial Remaining</MudText>
+                            <MudText Typo="Typo.body1" Color="@(_trialDays <= 3 ? Color.Warning : Color.Success)">
+                                @_trialDays days
+                            </MudText>
+                        </MudItem>
+                    }
+                    @if (_sub.CancelledAt.HasValue)
+                    {
+                        <MudItem xs="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Cancelled</MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Error">@_sub.CancelledAt.Value.LocalDateTime.ToString("MMM d, yyyy")</MudText>
+                        </MudItem>
+                    }
+                    @if (_sub.PaymentFailedAt.HasValue)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Error" Dense="true">
+                                Payment failed on @_sub.PaymentFailedAt.Value.LocalDateTime.ToString("MMM d"). Please update your payment method.
+                            </MudAlert>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @* ── Tier Comparison ── *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Plans</MudText>
+        <MudGrid Spacing="3">
+            @foreach (var tier in _tiers)
+            {
+                <MudItem xs="12" sm="4">
+                    <MudCard Elevation="0" Style="@($"border: 1px solid {(tier.Tier == _sub.Tier ? "#7C3AED" : "#1F1F2E")};")">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">@tier.Tier</MudText>
+                            <MudText Typo="Typo.h4" Color="Color.Primary" Class="my-2">@tier.Price</MudText>
+                            <MudList T="string" Dense="true">
+                                @foreach (var f in tier.Features)
+                                {
+                                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                                        @f
+                                    </MudListItem>
+                                }
+                            </MudList>
+                            @if (tier.Tier == _sub.Tier)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" Disabled="true"
+                                           Class="mt-2">Current Plan</MudButton>
+                            }
+                            else if (tier.Tier > _sub.Tier)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                           Class="mt-2" OnClick="() => Upgrade(tier.Tier)">Upgrade</MudButton>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudPaper>
+
+    @* ── Manage ── *@
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Manage</MudText>
+        @if (!string.IsNullOrEmpty(_sub.StripeCustomerId))
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenPortal" Class="mr-2">
+                Billing Portal
+            </MudButton>
+        }
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private UserSubscription? _sub;
+    private int? _trialDays;
+
+    private static readonly List<TierInfo> _tiers =
+    [
+        new(SubscriptionTier.Athlete, "$9/mo", ["Workout tracking", "Weight & cardio logging", "Fatigue monitoring", "Deficit management"]),
+        new(SubscriptionTier.Competitor, "$19/mo", ["Everything in Athlete", "Program generation", "Charts & analytics", "Goals & insights", "Training partners"]),
+        new(SubscriptionTier.Coach, "$39/mo", ["Everything in Competitor", "Athlete management", "Alert dashboard", "Program gen for athletes"]),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _sub = await SubService.GetSubscriptionAsync(CurrentUser.UserId);
+        if (_sub is not null) _trialDays = SubService.GetTrialDaysRemaining(_sub);
+        _loading = false;
+    }
+
+    private async Task Upgrade(SubscriptionTier tier)
+    {
+        if (_sub is null) return;
+
+        var needsPayment = await SubService.RequiresPaymentAsync(CurrentUser.UserId, tier);
+        if (needsPayment)
+        {
+            try
+            {
+                var customerId = _sub.StripeCustomerId;
+                if (string.IsNullOrEmpty(customerId))
+                {
+                    var user = await Db.Users.FindAsync(CurrentUser.UserId);
+                    customerId = await PaymentService.CreateOrGetCustomerAsync(
+                        CurrentUser.UserId, user!.Email!, user.DisplayName);
+                    await SubService.SetStripeCustomerIdAsync(CurrentUser.UserId, customerId);
+                }
+
+                var baseUrl = Nav.BaseUri.TrimEnd('/');
+                var checkout = await PaymentService.CreateCheckoutSessionAsync(
+                    CurrentUser.UserId, customerId, tier, BillingInterval.Monthly,
+                    $"{baseUrl}/app/subscription", $"{baseUrl}/app/subscription");
+                Nav.NavigateTo(checkout.SessionUrl, forceLoad: true);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+        else
+        {
+            await SubService.ChangeTierAsync(CurrentUser.UserId, tier);
+            _sub = await SubService.GetSubscriptionAsync(CurrentUser.UserId);
+            Snackbar.Add($"Upgraded to {tier}!", Severity.Success);
+        }
+    }
+
+    private async Task OpenPortal()
+    {
+        if (_sub?.StripeCustomerId is null) return;
+        try
+        {
+            var baseUrl = Nav.BaseUri.TrimEnd('/');
+            var url = await PaymentService.CreatePortalSessionAsync(
+                _sub.StripeCustomerId, $"{baseUrl}/app/subscription");
+            Nav.NavigateTo(url, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    [Inject] private TrainingApp.Infrastructure.Data.TrainingAppDbContext Db { get; set; } = default!;
+
+    private static Color StatusColor(SubscriptionStatus s) => s switch
+    {
+        SubscriptionStatus.Active => Color.Success,
+        SubscriptionStatus.Trial => Color.Info,
+        SubscriptionStatus.PastDue => Color.Warning,
+        SubscriptionStatus.Cancelled => Color.Error,
+        SubscriptionStatus.Expired => Color.Error,
+        _ => Color.Default
+    };
+
+    private sealed record TierInfo(SubscriptionTier Tier, string Price, List<string> Features);
+}

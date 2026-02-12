@@ -1,0 +1,178 @@
+@page "/app/partners"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IPartnershipService PartnerService
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>Partners — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Training Partners" Subtitle="Train together, push each other">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="CreateInvite">Create Invite</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Link"
+                   OnClick="() => _showAccept = true" Class="ml-2">Accept Invite</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Active Partnership ── *@
+    @if (_active is not null)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #7C3AED;">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">ACTIVE PARTNER</MudText>
+                    <MudText Typo="Typo.h5">
+                        @PartnerName(_active)
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Since @_active.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")
+                    </MudText>
+                </div>
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               Href="/app/sessions">Sessions</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                               OnClick="() => EndPartnership(_active)">End</MudButton>
+                </div>
+            </div>
+        </MudPaper>
+    }
+
+    @* ── Pending Invites ── *@
+    @if (Pending.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Pending Invites</MudText>
+            @foreach (var p in Pending)
+            {
+                <MudCard Elevation="0" Class="mb-2 pa-3" Style="border: 1px solid #1F1F2E;">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.body1">Invite Code: <b>@p.InviteCode</b></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Created @p.CreatedAt.LocalDateTime.ToString("MMM d")
+                                @if (p.ExpiresAt.HasValue) { <span> · Expires @p.ExpiresAt.Value.LocalDateTime.ToString("MMM d")</span> }
+                            </MudText>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small"
+                                       OnClick="() => CopyCode(p.InviteCode)" />
+                    </div>
+                </MudCard>
+            }
+        </MudPaper>
+    }
+
+    @* ── History ── *@
+    @if (Ended.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Past Partnerships</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead><tr><th>Partner</th><th>Started</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var p in Ended)
+                    {
+                        <tr>
+                            <td>@PartnerName(p)</td>
+                            <td>@p.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")</td>
+                            <td><MudChip T="string" Size="Size.Small" Color="Color.Default">@p.Status</MudChip></td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+
+    @if (_active is null && !Pending.Any() && !Ended.Any())
+    {
+        <EmptyState Message="No partnerships yet. Invite a training partner!"
+                    Icon="@Icons.Material.Filled.Handshake"
+                    ActionText="Create Invite" OnAction="CreateInvite" />
+    }
+}
+
+</TierGate>
+
+@* ── Accept Invite Dialog ── *@
+<MudDialog @bind-Visible="_showAccept">
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_acceptCode" Label="Invite Code" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showAccept = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AcceptInvite"
+                   Disabled="string.IsNullOrWhiteSpace(_acceptCode)">Accept</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private Partnership? _active;
+    private List<Partnership> _partnerships = [];
+
+    private List<Partnership> Pending => _partnerships.Where(p => p.Status == PartnershipStatus.Pending).ToList();
+    private List<Partnership> Ended => _partnerships.Where(p => p.Status == PartnershipStatus.Ended).ToList();
+    private bool _showAccept;
+    private string _acceptCode = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        _loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        _partnerships = await PartnerService.GetPartnershipsAsync(CurrentUser.UserId, default);
+        _active = await PartnerService.GetActivePartnershipAsync(CurrentUser.UserId, default);
+    }
+
+    private async Task CreateInvite()
+    {
+        await PartnerService.CreateInviteAsync(CurrentUser.UserId, default);
+        await LoadData();
+        Snackbar.Add("Invite created! Share the code with your partner.", Severity.Success);
+    }
+
+    private async Task AcceptInvite()
+    {
+        if (string.IsNullOrWhiteSpace(_acceptCode)) return;
+        try
+        {
+            await PartnerService.AcceptInviteAsync(CurrentUser.UserId, _acceptCode.Trim(), default);
+            _showAccept = false;
+            await LoadData();
+            Snackbar.Add("Partnership accepted!", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task EndPartnership(Partnership p)
+    {
+        await PartnerService.EndPartnershipAsync(CurrentUser.UserId, p.Id, default);
+        await LoadData();
+        Snackbar.Add("Partnership ended", Severity.Info);
+    }
+
+    private void CopyCode(string code) => Snackbar.Add($"Code: {code} (copy from above)", Severity.Info);
+
+    private string PartnerName(Partnership p)
+    {
+        if (p.RequesterId == CurrentUser.UserId)
+            return p.Responder?.DisplayName ?? "Waiting for partner...";
+        return p.Requester?.DisplayName ?? "Partner";
+    }
+}

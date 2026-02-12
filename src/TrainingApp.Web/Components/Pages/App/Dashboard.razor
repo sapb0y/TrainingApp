@@ -1,0 +1,333 @@
+@page "/app/dashboard"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject IFatigueModelService FatigueService
+
+<PageTitle>Dashboard — FitSpiralS</PageTitle>
+
+<PageHeader Title="Dashboard" Subtitle="Your training overview" />
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_summary is null)
+{
+    <EmptyState Message="No training data yet. Start a workout to see your stats!"
+                Icon="@Icons.Material.Filled.FitnessCenter"
+                ActionText="New Workout" OnAction="GoToWorkouts" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @* ── Strength ── *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">STRENGTH</MudText>
+                    @if (_summary.Strength.ExercisesTracked > 0)
+                    {
+                        <MudText Typo="Typo.h4">@_summary.Strength.ExercisesTracked</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">exercises tracked</MudText>
+                        @if (_summary.Strength.TopE1rm.HasValue)
+                        {
+                            <MudText Typo="Typo.body1" Class="mt-2">
+                                <b>@_summary.Strength.TopE1rm.Value.ToString("N1") kg</b> — @_summary.Strength.TopExercise
+                            </MudText>
+                        }
+                        @if (_summary.Strength.E1rmChangePct30d.HasValue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Class="mt-1"
+                                     Color="@(_summary.Strength.E1rmChangePct30d >= 0 ? Color.Success : Color.Error)">
+                                @(_summary.Strength.E1rmChangePct30d >= 0 ? "+" : "")@_summary.Strength.E1rmChangePct30d.Value.ToString("N1")%
+                            </MudChip>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No strength data yet</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* ── Body Weight ── *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">BODY WEIGHT</MudText>
+                    @if (_summary.BodyWeight.CurrentKg.HasValue)
+                    {
+                        <MudText Typo="Typo.h4">@_summary.BodyWeight.CurrentKg.Value.ToString("N1") <span style="font-size:0.5em">kg</span></MudText>
+                        @if (_summary.BodyWeight.MovingAvg7d.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                7d avg: @_summary.BodyWeight.MovingAvg7d.Value.ToString("N1") kg
+                            </MudText>
+                        }
+                        @if (_summary.BodyWeight.Trend is not null)
+                        {
+                            <MudChip T="string" Size="Size.Small" Class="mt-1" Color="Color.Info">@_summary.BodyWeight.Trend</MudChip>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No weight data logged</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* ── Activity ── *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">ACTIVITY (30D)</MudText>
+                    <MudText Typo="Typo.h4">@_activeDays <span style="font-size:0.5em">days</span></MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">active days</MudText>
+                    @if (_summary.Cardio.SessionsLast30d > 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            @_summary.Cardio.SessionsLast30d sessions · @_summary.Cardio.MinutesLast30d min
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* ── Volume ── *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">VOLUME (7D)</MudText>
+                    @if (_summary.Volume.TotalSetsLast7d > 0)
+                    {
+                        <MudText Typo="Typo.h4">@_summary.Volume.TotalSetsLast7d <span style="font-size:0.5em">sets</span></MudText>
+                        @if (_summary.Volume.TotalVolumeLast7d.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @_summary.Volume.TotalVolumeLast7d.Value.ToString("N0") kg total
+                            </MudText>
+                        }
+                        @if (_summary.Volume.VolumeChangePctVsPrev7d.HasValue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Class="mt-1"
+                                     Color="@(_summary.Volume.VolumeChangePctVsPrev7d >= 0 ? Color.Success : Color.Error)">
+                                @(_summary.Volume.VolumeChangePctVsPrev7d >= 0 ? "+" : "")@_summary.Volume.VolumeChangePctVsPrev7d.Value.ToString("N1")%
+                            </MudChip>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No volume this week</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* ── Readiness ── *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">READINESS</MudText>
+                    @if (_summary.Fatigue.ReadinessCategory is not null)
+                    {
+                        <MudText Typo="Typo.h4" Color="@ReadinessColor(_summary.Fatigue.ReadinessCategory)">
+                            @_summary.Fatigue.ReadinessCategory
+                        </MudText>
+                        @if (_summary.Fatigue.Tsb.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                TSB: @_summary.Fatigue.Tsb.Value.ToString("N1")
+                            </MudText>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">Not enough data</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* ── Recent PRs ── *@
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">RECENT PRs</MudText>
+                    @if (_recentPRs.Count > 0)
+                    {
+                        <MudList T="string" Dense="true">
+                            @foreach (var pr in _recentPRs)
+                            {
+                                <MudListItem Icon="@Icons.Material.Filled.EmojiEvents" IconColor="Color.Warning">
+                                    <MudText Typo="Typo.body2">@pr.ExerciseName — <b>@pr.BestE1rm.ToString("N1") kg</b></MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No recent PRs</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private ChartDataService.DashboardSummary? _summary;
+    private int _activeDays;
+    private List<PRInfo> _recentPRs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsAuthenticated) return;
+
+        var userId = CurrentUser.UserId;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var thirtyDaysAgo = today.AddDays(-30);
+        var sevenDaysAgo = today.AddDays(-7);
+        var sixtyDaysAgo = today.AddDays(-60);
+
+        var recentSets = await Db.WorkoutSets
+            .AsNoTracking()
+            .Include(s => s.Workout)
+            .Include(s => s.Exercise)
+            .Where(s => s.Workout!.UserId == userId
+                && !s.IsWarmup
+                && s.ActualWeight != null && s.ActualReps != null
+                && s.ActualReps >= 1 && s.ActualReps <= 30
+                && s.Workout!.CompletedAt != null
+                && DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime) >= sixtyDaysAgo)
+            .Select(s => new
+            {
+                Date = DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime),
+                ExerciseName = s.Exercise!.Name,
+                E1rm = s.ActualWeight!.Value * (1 + s.ActualReps!.Value / 30m)
+            })
+            .ToListAsync();
+
+        var exerciseBests = recentSets
+            .Where(s => s.Date >= thirtyDaysAgo)
+            .GroupBy(s => s.ExerciseName)
+            .Select(g => new { Name = g.Key, BestE1rm = g.Max(s => s.E1rm) })
+            .ToList();
+
+        var topExercise = exerciseBests.OrderByDescending(e => e.BestE1rm).FirstOrDefault();
+
+        decimal? e1rmChangePct = null;
+        if (topExercise is not null)
+        {
+            var prevBest = recentSets
+                .Where(s => s.ExerciseName == topExercise.Name && s.Date >= sixtyDaysAgo && s.Date < thirtyDaysAgo)
+                .Select(s => s.E1rm).DefaultIfEmpty(0).Max();
+            if (prevBest > 0)
+                e1rmChangePct = Math.Round((topExercise.BestE1rm - prevBest) / prevBest * 100m, 1);
+        }
+
+        var strengthSnapshot = new ChartDataService.StrengthSnapshot(
+            exerciseBests.Count, topExercise?.BestE1rm, topExercise?.Name, e1rmChangePct);
+
+        var latestWeight = await Db.WeightLogs.AsNoTracking()
+            .Where(w => w.UserId == userId).OrderByDescending(w => w.Date).FirstOrDefaultAsync();
+
+        var weightTrend = "N/A";
+        if (latestWeight is not null)
+        {
+            var weightPoints = await Db.WeightLogs.AsNoTracking()
+                .Where(w => w.UserId == userId && w.Date >= thirtyDaysAgo)
+                .OrderBy(w => w.Date).Select(w => new { w.Date, w.WeightKg }).ToListAsync();
+            weightTrend = ProgressAnalyticsService.DetectTrend(weightPoints.Select(w => (w.Date, w.WeightKg)));
+        }
+
+        var bodyWeightSnapshot = new ChartDataService.BodyWeightSnapshot(
+            latestWeight?.WeightKg, latestWeight?.MovingAverage7d, latestWeight?.WeeklyRateKg, weightTrend);
+
+        var cardioSessions = await Db.CardioSessions.AsNoTracking()
+            .Where(c => c.UserId == userId && c.Date >= thirtyDaysAgo).ToListAsync();
+
+        var cardioSnapshot = new ChartDataService.CardioSnapshot(
+            cardioSessions.Count, cardioSessions.Sum(c => c.DurationMinutes),
+            cardioSessions.Where(c => c.DistanceKm.HasValue).Sum(c => c.DistanceKm),
+            cardioSessions.Count > 0
+                ? Math.Round(cardioSessions.Where(c => c.CardioTrimp.HasValue).Select(c => c.CardioTrimp!.Value).DefaultIfEmpty(0).Average(), 1)
+                : null);
+
+        var latestMetrics = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == userId).OrderByDescending(m => m.Date).FirstOrDefaultAsync();
+
+        string? readinessCategory = null;
+        if (latestMetrics?.ReadinessScore is not null)
+        {
+            readinessCategory = latestMetrics.ReadinessScore.Value switch
+            {
+                >= 8m => "Excellent",
+                >= 6m => "Good",
+                >= 4m => "Moderate",
+                >= 3m => "Poor",
+                _ => "Very Poor"
+            };
+        }
+
+        var fatigueSnapshot = new ChartDataService.FatigueSnapshot(
+            latestMetrics?.Ctl, latestMetrics?.Atl, latestMetrics?.Tsb, readinessCategory);
+
+        var last7d = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == userId && m.Date >= sevenDaysAgo).ToListAsync();
+        var prev7d = await Db.DailyMetrics.AsNoTracking()
+            .Where(m => m.UserId == userId && m.Date >= sevenDaysAgo.AddDays(-7) && m.Date < sevenDaysAgo).ToListAsync();
+
+        var totalSets7d = last7d.Sum(m => m.TotalSets);
+        var totalVolume7d = last7d.Sum(m => m.TotalVolume);
+        var prevVolume7d = prev7d.Sum(m => m.TotalVolume);
+        decimal? volumeChangePct = prevVolume7d > 0 ? Math.Round((totalVolume7d - prevVolume7d) / prevVolume7d * 100m, 1) : null;
+
+        var volumeSnapshot = new ChartDataService.VolumeSnapshot(totalSets7d, totalVolume7d > 0 ? totalVolume7d : null, volumeChangePct);
+
+        var workoutDates = await Db.WorkoutSets.AsNoTracking().Include(s => s.Workout)
+            .Where(s => s.Workout!.UserId == userId && s.Workout!.CompletedAt != null
+                && DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime) >= thirtyDaysAgo)
+            .Select(s => DateOnly.FromDateTime(s.Workout!.CompletedAt!.Value.UtcDateTime)).Distinct().ToListAsync();
+
+        var cardioDates = await Db.CardioSessions.AsNoTracking()
+            .Where(c => c.UserId == userId && c.Date >= thirtyDaysAgo).Select(c => c.Date).Distinct().ToListAsync();
+
+        _activeDays = workoutDates.Union(cardioDates).Distinct().Count();
+
+        _recentPRs = ProgressAnalyticsService.FindPersonalRecords(
+            recentSets.Select(s => (s.Date, s.E1rm, s.ExerciseName)))
+            .Where(pr => pr.IsRecent).Take(5)
+            .Select(pr => new PRInfo(pr.ExerciseName, Math.Round(pr.BestE1rm, 1), pr.Date)).ToList();
+
+        _summary = ChartDataService.CalculateDashboardSummary(
+            strengthSnapshot, bodyWeightSnapshot, cardioSnapshot, fatigueSnapshot, volumeSnapshot, _activeDays);
+
+        _loading = false;
+    }
+
+    private void GoToWorkouts() => Nav.NavigateTo("/app/workouts");
+
+    private static Color ReadinessColor(string category) => category switch
+    {
+        "Excellent" => Color.Success,
+        "Good" => Color.Info,
+        "Moderate" => Color.Warning,
+        "Poor" => Color.Error,
+        _ => Color.Error
+    };
+
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private sealed record PRInfo(string ExerciseName, decimal BestE1rm, DateOnly Date);
+}

@@ -1,0 +1,38 @@
+<MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+    <MudCardContent Class="pa-3">
+        <div class="d-flex align-center justify-space-between">
+            <MudText Typo="Typo.overline" Color="Color.Secondary">@Label</MudText>
+            @if (!string.IsNullOrEmpty(Icon))
+            {
+                <MudIcon Icon="@Icon" Size="Size.Small" Color="Color.Secondary" />
+            }
+        </div>
+        <MudText Typo="Typo.h4" Class="mt-1">
+            @Value
+            @if (!string.IsNullOrEmpty(Unit))
+            {
+                <span style="font-size:0.5em; opacity:0.7"> @Unit</span>
+            }
+        </MudText>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@Subtitle</MudText>
+        }
+        @if (Change.HasValue)
+        {
+            <MudChip T="string" Size="Size.Small" Class="mt-1"
+                     Color="@(Change >= 0 ? Color.Success : Color.Error)">
+                @(Change >= 0 ? "+" : "")@Change.Value.ToString("N1")%
+            </MudChip>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public required string Label { get; set; }
+    [Parameter] public required string Value { get; set; }
+    [Parameter] public string? Unit { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public decimal? Change { get; set; }
+}

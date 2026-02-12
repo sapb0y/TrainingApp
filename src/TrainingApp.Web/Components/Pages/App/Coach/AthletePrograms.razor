@@ -1,0 +1,173 @@
+@page "/app/coach/athlete/{AthleteId:guid}/programs"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@using ProgramEntity = TrainingApp.Core.Entities.Program
+@attribute [Authorize]
+@inject ICoachAthleteService CoachService
+@inject IProgramGeneratorService Generator
+@inject ICurrentUserService CurrentUser
+@inject TrainingAppDbContext Db
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Athlete Programs — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Coach">
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Error">No access to this athlete.</MudAlert>
+}
+else
+{
+    <PageHeader Title="@($"{_athleteName}'s Programs")" Subtitle="Generate and manage training programs">
+        <Actions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       OnClick="GoBack">Back to Athlete</MudButton>
+            @if (_canModify)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           Class="ml-2" OnClick="() => _showGenerate = true">Generate Program</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (!_programs.Any())
+    {
+        <EmptyState Message="No programs yet for this athlete" Icon="@Icons.Material.Filled.EventNote"
+                    ActionText="Generate Program" OnAction="() => _showGenerate = true" />
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var p in _programs)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">@p.Name</MudText>
+                            <div class="d-flex gap-2 mt-1 mb-2">
+                                <MudChip T="string" Size="Size.Small">@p.Goal</MudChip>
+                                <MudChip T="string" Size="Size.Small">@p.Template</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@ProgramStatusColor(p.Status)">@p.Status</MudChip>
+                            </div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@p.DurationWeeks weeks</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Created @p.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+
+</TierGate>
+
+@* ── Generate Dialog ── *@
+<MudDialog @bind-Visible="_showGenerate">
+    <TitleContent>Generate Program</TitleContent>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_genName" Label="Program Name" Variant="Variant.Outlined" Class="mb-3" />
+        <MudSelect T="string" @bind-Value="_genGoal" Label="Goal" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var g in Enum.GetNames<ProgramGoal>())
+            {
+                <MudSelectItem T="string" Value="@g">@g</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" @bind-Value="_genTemplate" Label="Template" Variant="Variant.Outlined" Class="mb-3">
+            @foreach (var t in Enum.GetNames<ProgramTemplate>())
+            {
+                <MudSelectItem T="string" Value="@t">@t</MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField T="int" @bind-Value="_genDuration" Label="Duration (weeks)" Variant="Variant.Outlined" Min="1" Max="52" Class="mb-3" />
+        <MudDatePicker Label="Start Date" @bind-Date="_genStart" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showGenerate = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Generate"
+                   Disabled="@(string.IsNullOrWhiteSpace(_genName))">Generate</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid AthleteId { get; set; }
+
+    private bool _loading = true;
+    private bool _hasAccess;
+    private bool _canModify;
+    private string _athleteName = "";
+    private List<ProgramSummary> _programs = [];
+
+    // Generate form
+    private bool _showGenerate;
+    private string _genName = "";
+    private string _genGoal = "Hypertrophy";
+    private string _genTemplate = "PushPullLegs";
+    private int _genDuration = 8;
+    private DateTime? _genStart = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!CurrentUser.IsCoach) { _loading = false; return; }
+
+        try
+        {
+            await CoachService.ValidateCoachAccessAsync(CurrentUser.UserId, AthleteId, default);
+            _hasAccess = true;
+        }
+        catch { _loading = false; return; }
+
+        var rel = await CoachService.GetRelationshipAsync(CurrentUser.UserId, AthleteId, default);
+        _canModify = rel?.Permissions.CanModifyProgram ?? false;
+
+        var athlete = await Db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == AthleteId);
+        _athleteName = athlete?.DisplayName ?? "Unknown";
+
+        await LoadPrograms();
+        _loading = false;
+    }
+
+    private async Task LoadPrograms()
+    {
+        _programs = await Db.Programs.AsNoTracking()
+            .Where(p => p.UserId == AthleteId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new ProgramSummary(p.Id, p.Name, p.Goal.ToString(), p.Template.ToString(),
+                p.Status.ToString(), p.DurationWeeks, p.CreatedAt))
+            .ToListAsync();
+    }
+
+    private async Task Generate()
+    {
+        if (string.IsNullOrWhiteSpace(_genName)) return;
+        try
+        {
+            var goal = Enum.Parse<ProgramGoal>(_genGoal, true);
+            var template = Enum.Parse<ProgramTemplate>(_genTemplate, true);
+            var start = _genStart.HasValue ? DateOnly.FromDateTime(_genStart.Value) : DateOnly.FromDateTime(DateTime.Today);
+            await Generator.GenerateProgramAsync(AthleteId, _genName, goal, template, _genDuration, start, default);
+            await LoadPrograms();
+            _showGenerate = false;
+            Snackbar.Add("Program generated!", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private void GoBack() => Nav.NavigateTo($"/app/coach/athlete/{AthleteId}");
+
+    private static Color ProgramStatusColor(string s) => s switch
+    {
+        "Active" => Color.Success, "Completed" => Color.Info, "Archived" => Color.Default, _ => Color.Warning
+    };
+
+    private record ProgramSummary(Guid Id, string Name, string Goal, string Template, string Status, int DurationWeeks, DateTimeOffset CreatedAt);
+}

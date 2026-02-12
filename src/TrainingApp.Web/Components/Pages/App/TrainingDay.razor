@@ -1,0 +1,232 @@
+@page "/app/training-day"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICardioTrackingService CardioService
+@inject IFatigueModelService FatigueService
+@inject ICurrentUserService CurrentUser
+
+<PageTitle>Training Day — FitSpiralS</PageTitle>
+
+<PageHeader Title="Training Day" Subtitle="@_date.ToString("dddd, MMMM d yyyy")">
+    <Actions>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="PrevDay" />
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="GoToday">Today</MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="NextDay" />
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @* ── Readiness ── *@
+        <MudItem xs="12" sm="6" md="3">
+            <StatCard Label="READINESS" Value="@ReadinessLabel(_metrics?.ReadinessScore)"
+                      Icon="@Icons.Material.Filled.Battery3Bar"
+                      Subtitle="@($"TSB: {_metrics?.Tsb.ToString("N1") ?? "—"}")" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <StatCard Label="TRAINING STRESS" Value="@(_summary?.TotalTrimp.ToString("N0") ?? "0")"
+                      Icon="@Icons.Material.Filled.Whatshot"
+                      Subtitle="TRIMP today" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <StatCard Label="STRENGTH" Value="@(_workoutCount.ToString())" Unit="workouts"
+                      Icon="@Icons.Material.Filled.FitnessCenter"
+                      Subtitle="@($"{_totalSets} sets · {_totalVolume:N0} kg")" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <StatCard Label="CARDIO" Value="@(_cardioSessions.Count.ToString())" Unit="sessions"
+                      Icon="@Icons.Material.Filled.DirectionsRun"
+                      Subtitle="@($"{_cardioSessions.Sum(c => c.DurationMinutes)} min")" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── Interference Analysis ── *@
+    @if (_summary is not null && (_summary.StrengthSessions > 0 || _summary.CardioSessions > 0))
+    {
+        <MudPaper Elevation="0" Class="pa-4 mt-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Interference Analysis</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Interference Score</MudText>
+                    <div class="d-flex align-center gap-2 mt-1">
+                        <MudProgressLinear Value="@((double)_summary.InterferenceScore * 10)"
+                                           Color="@InterferenceColor(_summary.InterferenceLevel)"
+                                           Size="Size.Large" Style="flex:1" />
+                        <MudChip T="string" Size="Size.Small" Color="@InterferenceColor(_summary.InterferenceLevel)">
+                            @_summary.InterferenceLevel
+                        </MudChip>
+                    </div>
+                </MudItem>
+                @if (_sequencing is not null)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sequencing Recommendation</MudText>
+                        <MudText Typo="Typo.body1" Class="mt-1"><b>@_sequencing.RecommendedOrder</b></MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @_sequencing.Rationale · @_sequencing.SeparationHours hr separation ideal
+                        </MudText>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @* ── Workouts ── *@
+    @if (_workouts.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Workouts</MudText>
+            @foreach (var w in _workouts)
+            {
+                <MudCard Elevation="0" Class="mb-2 pa-3" Style="border: 1px solid #1F1F2E;">
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.subtitle1"><b>@w.Name</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@StatusColor(w.Status)">@w.Status</MudChip>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @w.Sets.Count sets
+                        @if (w.SessionRpe.HasValue) { <span> · RPE @w.SessionRpe</span> }
+                    </MudText>
+                </MudCard>
+            }
+        </MudPaper>
+    }
+
+    @* ── Cardio Sessions ── *@
+    @if (_cardioSessions.Any())
+    {
+        <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Cardio Sessions</MudText>
+            @foreach (var c in _cardioSessions)
+            {
+                <MudCard Elevation="0" Class="mb-2 pa-3" Style="border: 1px solid #1F1F2E;">
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.subtitle1"><b>@c.Modality</b></MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@c.Zone</MudChip>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @c.DurationMinutes min
+                        @if (c.DistanceKm.HasValue) { <span> · @c.DistanceKm.Value.ToString("N1") km</span> }
+                        @if (c.CardioTrimp.HasValue) { <span> · TRIMP @c.CardioTrimp.Value.ToString("N0")</span> }
+                    </MudText>
+                </MudCard>
+            }
+        </MudPaper>
+    }
+
+    @if (!_workouts.Any() && !_cardioSessions.Any())
+    {
+        <EmptyState Message="No training recorded for this day" Icon="@Icons.Material.Filled.EventBusy" />
+    }
+}
+
+@code {
+    private DateOnly _date = DateOnly.FromDateTime(DateTime.UtcNow);
+    private bool _loading = true;
+
+    private DailyMetrics? _metrics;
+    private List<Workout> _workouts = [];
+    private List<CardioSession> _cardioSessions = [];
+    private InterferenceCalculatorService.DailyTrainingSummary? _summary;
+    private InterferenceCalculatorService.SequencingResult? _sequencing;
+    private int _workoutCount;
+    private int _totalSets;
+    private decimal _totalVolume;
+
+    protected override async Task OnInitializedAsync() => await LoadDay();
+
+    private async Task LoadDay()
+    {
+        _loading = true;
+        var userId = CurrentUser.UserId;
+
+        _metrics = (await FatigueService.GetHistoryAsync(userId, _date, _date)).FirstOrDefault();
+
+        _workouts = await Db.Workouts.AsNoTracking()
+            .Include(w => w.Sets)
+            .Where(w => w.UserId == userId
+                && DateOnly.FromDateTime(w.ScheduledAt.UtcDateTime) == _date)
+            .ToListAsync();
+
+        _cardioSessions = await CardioService.GetCardioForDateAsync(userId, _date);
+
+        _workoutCount = _workouts.Count;
+        _totalSets = _workouts.Sum(w => w.Sets.Count);
+        _totalVolume = _workouts.SelectMany(w => w.Sets)
+            .Where(s => s.ActualWeight.HasValue && s.ActualReps.HasValue)
+            .Sum(s => s.ActualWeight!.Value * s.ActualReps!.Value);
+
+        // Interference calc
+        var strengthTrimp = _metrics?.Trimp ?? 0;
+        var cardioTrimp = _cardioSessions.Sum(c => c.CardioTrimp ?? 0);
+        var interferenceScore = 0m;
+        var interferenceLevel = "None";
+
+        if (_cardioSessions.Any() && _workouts.Any())
+        {
+            var firstCardio = _cardioSessions.First();
+            var muscleGroups = _workouts.SelectMany(w => w.Sets)
+                .Where(s => s.Exercise is not null)
+                .SelectMany(s => s.Exercise!.PrimaryMuscles ?? [])
+                .Distinct().ToList();
+
+            // Exercises aren't loaded in sets (no ThenInclude) — just use empty if needed
+            var interference = InterferenceCalculatorService.CalculateInterferenceScore(
+                firstCardio.Modality, firstCardio.Zone, firstCardio.DurationMinutes, muscleGroups);
+            interferenceScore = interference.Score;
+            interferenceLevel = interference.Level;
+
+            _sequencing = InterferenceCalculatorService.RecommendSequencing(
+                true, true, firstCardio.Modality, firstCardio.Zone);
+        }
+
+        _summary = InterferenceCalculatorService.CalculateDailySummary(
+            strengthTrimp, _workoutCount, cardioTrimp, _cardioSessions.Count,
+            interferenceScore, interferenceLevel);
+
+        _loading = false;
+    }
+
+    private async Task PrevDay() { _date = _date.AddDays(-1); await LoadDay(); }
+    private async Task NextDay() { _date = _date.AddDays(1); await LoadDay(); }
+    private async Task GoToday() { _date = DateOnly.FromDateTime(DateTime.UtcNow); await LoadDay(); }
+
+    private static string ReadinessLabel(decimal? score) => score switch
+    {
+        >= 8 => "Excellent",
+        >= 6 => "Good",
+        >= 4 => "Moderate",
+        >= 3 => "Poor",
+        null => "—",
+        _ => "Low"
+    };
+
+    private static Color InterferenceColor(string level) => level switch
+    {
+        "None" => Color.Success,
+        "Low" => Color.Info,
+        "Moderate" => Color.Warning,
+        "High" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static Color StatusColor(WorkoutStatus status) => status switch
+    {
+        WorkoutStatus.Planned => Color.Info,
+        WorkoutStatus.InProgress => Color.Warning,
+        WorkoutStatus.Completed => Color.Success,
+        _ => Color.Default
+    };
+}

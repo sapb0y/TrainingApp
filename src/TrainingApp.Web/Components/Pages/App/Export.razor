@@ -1,0 +1,111 @@
+@page "/app/export"
+@layout AppLayout
+@rendermode InteractiveServer
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@attribute [Authorize]
+@inject IExportService ExportService
+@inject ICurrentUserService CurrentUser
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<PageTitle>Export — FitSpiralS</PageTitle>
+
+<TierGate RequiredTier="SubscriptionTier.Competitor">
+
+<PageHeader Title="Export Data" Subtitle="Download your training data as CSV" />
+
+<MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+    <MudText Typo="Typo.h6" Class="mb-3">Date Range</MudText>
+    <MudGrid Spacing="2" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudDatePicker Label="From" @bind-Date="_from" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudDatePicker Label="To" @bind-Date="_to" Variant="Variant.Outlined" />
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent Class="d-flex flex-column align-center pa-4">
+                    <MudIcon Icon="@Icons.Material.Filled.FitnessCenter" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                    <MudText Typo="Typo.h6">Workouts</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">Sets, reps, weight, RPE</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ExportWorkouts"
+                               Disabled="_exporting" FullWidth="true">
+                        @if (_exportingType == "workouts") { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
+                        Download CSV
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent Class="d-flex flex-column align-center pa-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Scale" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                    <MudText Typo="Typo.h6">Weight</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">Daily logs, averages, trend</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ExportWeight"
+                               Disabled="_exporting" FullWidth="true">
+                        @if (_exportingType == "weight") { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
+                        Download CSV
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="0" Style="border: 1px solid #1F1F2E;">
+                <MudCardContent Class="d-flex flex-column align-center pa-4">
+                    <MudIcon Icon="@Icons.Material.Filled.DirectionsRun" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                    <MudText Typo="Typo.h6">Cardio</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">Sessions, TRIMP, zones</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ExportCardio"
+                               Disabled="_exporting" FullWidth="true">
+                        @if (_exportingType == "cardio") { <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" /> }
+                        Download CSV
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+</TierGate>
+
+@code {
+    private DateTime? _from = DateTime.Today.AddDays(-90);
+    private DateTime? _to = DateTime.Today;
+    private bool _exporting;
+    private string? _exportingType;
+
+    private DateOnly FromDate => _from.HasValue ? DateOnly.FromDateTime(_from.Value) : DateOnly.FromDateTime(DateTime.Today.AddDays(-90));
+    private DateOnly ToDate => _to.HasValue ? DateOnly.FromDateTime(_to.Value) : DateOnly.FromDateTime(DateTime.Today);
+
+    private async Task ExportWorkouts() => await DownloadCsv("workouts",
+        () => ExportService.ExportWorkoutsCsvAsync(CurrentUser.UserId, FromDate, ToDate, default));
+
+    private async Task ExportWeight() => await DownloadCsv("weight",
+        () => ExportService.ExportWeightLogsCsvAsync(CurrentUser.UserId, FromDate, ToDate, default));
+
+    private async Task ExportCardio() => await DownloadCsv("cardio",
+        () => ExportService.ExportCardioSessionsCsvAsync(CurrentUser.UserId, FromDate, ToDate, default));
+
+    private async Task DownloadCsv(string type, Func<Task<byte[]>> exportFunc)
+    {
+        _exporting = true;
+        _exportingType = type;
+        try
+        {
+            var bytes = await exportFunc();
+            var fileName = $"fitspirals-{type}-{FromDate:yyyy-MM-dd}-to-{ToDate:yyyy-MM-dd}.csv";
+            using var stream = new System.IO.MemoryStream(bytes);
+            using var streamRef = new DotNetStreamReference(stream);
+            await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+            Snackbar.Add($"{type} data exported", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add($"Export failed: {ex.Message}", Severity.Error); }
+        finally { _exporting = false; _exportingType = null; }
+    }
+}

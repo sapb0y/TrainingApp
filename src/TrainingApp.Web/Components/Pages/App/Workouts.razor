@@ -1,0 +1,237 @@
+@page "/app/workouts"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Workouts — FitSpiralS</PageTitle>
+
+<PageHeader Title="Workouts" Subtitle="Track your training sessions">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="CreateWorkout">New Workout</MudButton>
+    </Actions>
+</PageHeader>
+
+@* ── Filters ── *@
+<MudPaper Elevation="0" Class="pa-3 mb-4" Style="border: 1px solid #1F1F2E;">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="4">
+            <MudSelect T="WorkoutStatus?" Label="Status" Value="_statusFilter" ValueChanged="OnStatusChanged"
+                       Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="WorkoutStatus?" Value="WorkoutStatus.Planned">Planned</MudSelectItem>
+                <MudSelectItem T="WorkoutStatus?" Value="WorkoutStatus.InProgress">In Progress</MudSelectItem>
+                <MudSelectItem T="WorkoutStatus?" Value="WorkoutStatus.Completed">Completed</MudSelectItem>
+                <MudSelectItem T="WorkoutStatus?" Value="WorkoutStatus.Skipped">Skipped</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudTextField T="string" Label="Search" Value="_searchText" Immediate="true"
+                          DebounceInterval="400" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          ValueChanged="OnSearchChanged" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_workouts.Any())
+{
+    <EmptyState Message="No workouts found. Start training!" Icon="@Icons.Material.Filled.FitnessCenter"
+                ActionText="Create Workout" OnAction="CreateWorkout" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var w in _workouts)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="0" Style="border: 1px solid #1F1F2E; cursor: pointer;"
+                         @onclick="() => GoToWorkout(w.Id)">
+                    <MudCardContent>
+                        <div class="d-flex align-center justify-space-between mb-2">
+                            <MudText Typo="Typo.h6">@w.Name</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@StatusColor(w.Status)">@w.Status</MudChip>
+                        </div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @w.ScheduledAt.LocalDateTime.ToString("ddd, MMM d yyyy")
+                        </MudText>
+                        <div class="d-flex gap-3 mt-2">
+                            <MudText Typo="Typo.body2">
+                                <b>@w.Sets.Count</b> sets
+                            </MudText>
+                            @if (w.SessionRpe.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">
+                                    RPE <b>@w.SessionRpe</b>
+                                </MudText>
+                            }
+                            @if (w.CompletedAt.HasValue)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @FormatDuration(w.StartedAt, w.CompletedAt)
+                                </MudText>
+                            }
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @if (_hasMore)
+    {
+        <div class="d-flex justify-center mt-4">
+            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadMore">Load More</MudButton>
+        </div>
+    }
+}
+
+@* ── Create Workout Dialog ── *@
+<MudDialog @bind-Visible="_showCreateDialog">
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_newName" Label="Workout Name" Variant="Variant.Outlined"
+                      Required="true" RequiredError="Name is required" Class="mb-3" />
+        <MudDatePicker Label="Scheduled Date" @bind-Date="_newDate" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCreateDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitCreate"
+                   Disabled="string.IsNullOrWhiteSpace(_newName)">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private List<Workout> _workouts = [];
+    private WorkoutStatus? _statusFilter;
+    private string? _searchText;
+    private bool _hasMore;
+    private int _page;
+    private const int PageSize = 12;
+
+    private bool _showCreateDialog;
+    private string _newName = "";
+    private DateTime? _newDate = DateTime.Today;
+
+    protected override async Task OnInitializedAsync() => await LoadWorkouts();
+
+    private async Task LoadWorkouts()
+    {
+        _loading = true;
+        _page = 0;
+
+        var query = Db.Workouts.AsNoTracking()
+            .Include(w => w.Sets)
+            .Where(w => w.UserId == CurrentUser.UserId);
+
+        if (_statusFilter.HasValue)
+            query = query.Where(w => w.Status == _statusFilter.Value);
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+            query = query.Where(w => w.Name.Contains(_searchText));
+
+        var results = await query
+            .OrderByDescending(w => w.ScheduledAt)
+            .Take(PageSize + 1)
+            .ToListAsync();
+
+        _hasMore = results.Count > PageSize;
+        _workouts = results.Take(PageSize).ToList();
+        _loading = false;
+    }
+
+    private async Task LoadMore()
+    {
+        _page++;
+        var query = Db.Workouts.AsNoTracking()
+            .Include(w => w.Sets)
+            .Where(w => w.UserId == CurrentUser.UserId);
+
+        if (_statusFilter.HasValue)
+            query = query.Where(w => w.Status == _statusFilter.Value);
+        if (!string.IsNullOrWhiteSpace(_searchText))
+            query = query.Where(w => w.Name.Contains(_searchText));
+
+        var results = await query
+            .OrderByDescending(w => w.ScheduledAt)
+            .Skip(_page * PageSize)
+            .Take(PageSize + 1)
+            .ToListAsync();
+
+        _hasMore = results.Count > PageSize;
+        _workouts.AddRange(results.Take(PageSize));
+    }
+
+    private async Task OnStatusChanged(WorkoutStatus? value)
+    {
+        _statusFilter = value;
+        await LoadWorkouts();
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _searchText = value;
+        await LoadWorkouts();
+    }
+
+    private void GoToWorkout(Guid id) => Nav.NavigateTo($"/app/workouts/{id}");
+
+    private void CreateWorkout()
+    {
+        _newName = "";
+        _newDate = DateTime.Today;
+        _showCreateDialog = true;
+    }
+
+    private async Task SubmitCreate()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+
+        var workout = new Workout
+        {
+            Id = Guid.NewGuid(),
+            UserId = CurrentUser.UserId,
+            Name = _newName.Trim(),
+            ScheduledAt = _newDate.HasValue
+                ? new DateTimeOffset(_newDate.Value, TimeSpan.Zero)
+                : DateTimeOffset.UtcNow,
+            Status = WorkoutStatus.Planned,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        Db.Workouts.Add(workout);
+        await Db.SaveChangesAsync();
+
+        _showCreateDialog = false;
+        Snackbar.Add("Workout created", Severity.Success);
+        Nav.NavigateTo($"/app/workouts/{workout.Id}");
+    }
+
+    private static Color StatusColor(WorkoutStatus status) => status switch
+    {
+        WorkoutStatus.Planned => Color.Info,
+        WorkoutStatus.InProgress => Color.Warning,
+        WorkoutStatus.Completed => Color.Success,
+        WorkoutStatus.Skipped => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string FormatDuration(DateTimeOffset? start, DateTimeOffset? end)
+    {
+        if (start is null || end is null) return "";
+        var d = end.Value - start.Value;
+        return d.TotalHours >= 1 ? $"{d.Hours}h {d.Minutes}m" : $"{d.Minutes}m";
+    }
+}

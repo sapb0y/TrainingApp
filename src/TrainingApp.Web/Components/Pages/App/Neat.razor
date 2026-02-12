@@ -1,0 +1,179 @@
+@page "/app/neat"
+@layout AppLayout
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TrainingApp.Core.Entities
+@using TrainingApp.Core.Interfaces
+@using TrainingApp.Core.Services
+@using TrainingApp.Infrastructure.Data
+@attribute [Authorize]
+@inject TrainingAppDbContext Db
+@inject ICurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+
+<PageTitle>NEAT — FitSpiralS</PageTitle>
+
+<PageHeader Title="NEAT Tracking" Subtitle="Non-exercise activity thermogenesis">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="() => _showLog = true">Log Steps</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Summary ── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <StatCard Label="TODAY" Value="@(_todayLog?.StepCount.ToString("N0") ?? "—")" Unit="steps"
+                      Icon="@Icons.Material.Filled.DirectionsWalk" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="7D AVERAGE" Value="@_avgSteps7d.ToString("N0")" Unit="steps"
+                      Icon="@Icons.Material.Filled.Timeline" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="EST. NEAT" Value="@(_todayLog?.EstimatedNeatKcal?.ToString("N0") ?? "—")" Unit="kcal"
+                      Icon="@Icons.Material.Filled.Whatshot" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <StatCard Label="COMPENSATION" Value="@(_todayLog?.CompensationPercent?.ToString("N1") ?? "—")" Unit="%"
+                      Icon="@Icons.Material.Filled.Warning"
+                      Subtitle="@((_todayLog?.CompensationPercent ?? 0) > 20 ? "Steps significantly below baseline" : "Normal")" />
+        </MudItem>
+    </MudGrid>
+
+    @* ── Chart ── *@
+    @if (_logs.Count >= 2)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border: 1px solid #1F1F2E;">
+            <MudText Typo="Typo.h6" Class="mb-2">Step History (30 days)</MudText>
+            <MudChart ChartType="ChartType.Bar" ChartSeries="@_chartSeries"
+                      XAxisLabels="@_chartLabels" Width="100%" Height="250px" />
+        </MudPaper>
+    }
+
+    @* ── History ── *@
+    <MudPaper Elevation="0" Class="pa-4" Style="border: 1px solid #1F1F2E;">
+        <MudText Typo="Typo.h6" Class="mb-3">Log History</MudText>
+        @if (!_logs.Any())
+        {
+            <EmptyState Message="No NEAT data logged yet" Icon="@Icons.Material.Filled.DirectionsWalk"
+                        ActionText="Log Steps" OnAction="() => _showLog = true" />
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="background: transparent;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Steps</th>
+                        <th>Est. NEAT</th>
+                        <th>Compensation</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in _logs.OrderByDescending(l => l.Date))
+                    {
+                        <tr>
+                            <td>@l.Date.ToString("MMM d")</td>
+                            <td><b>@l.StepCount.ToString("N0")</b></td>
+                            <td>@(l.EstimatedNeatKcal?.ToString("N0") ?? "—") kcal</td>
+                            <td>@(l.CompensationPercent?.ToString("N1") ?? "—")%</td>
+                            <td>@(l.Notes ?? "")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+}
+
+@* ── Log Dialog ── *@
+<MudDialog @bind-Visible="_showLog">
+    <DialogContent>
+        <MudNumericField T="int" @bind-Value="_logSteps" Label="Steps" Variant="Variant.Outlined" Min="0" Class="mb-3" />
+        <MudDatePicker Label="Date" @bind-Date="_logDate" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_logNotes" Label="Notes" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showLog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitLog">Log</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private List<NeatLog> _logs = [];
+    private NeatLog? _todayLog;
+    private int _avgSteps7d;
+
+    // Log form
+    private bool _showLog;
+    private int _logSteps = 8000;
+    private DateTime? _logDate = DateTime.Today;
+    private string? _logNotes;
+
+    // Chart
+    private List<ChartSeries> _chartSeries = [];
+    private string[] _chartLabels = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        _loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        _logs = await Db.NeatLogs.AsNoTracking()
+            .Where(n => n.UserId == CurrentUser.UserId && n.Date >= today.AddDays(-30))
+            .OrderByDescending(n => n.Date)
+            .ToListAsync();
+
+        _todayLog = _logs.FirstOrDefault(l => l.Date == today);
+
+        var last7 = _logs.Where(l => l.Date >= today.AddDays(-7)).ToList();
+        _avgSteps7d = last7.Count > 0 ? (int)last7.Average(l => l.StepCount) : 0;
+
+        BuildChart();
+    }
+
+    private void BuildChart()
+    {
+        if (_logs.Count < 2) return;
+        var ordered = _logs.OrderBy(l => l.Date).ToList();
+        _chartLabels = ordered.Select(l => l.Date.ToString("M/d")).ToArray();
+        _chartSeries = [new ChartSeries { Name = "Steps", Data = ordered.Select(l => (double)l.StepCount).ToArray() }];
+    }
+
+    private async Task SubmitLog()
+    {
+        var date = _logDate.HasValue ? DateOnly.FromDateTime(_logDate.Value) : DateOnly.FromDateTime(DateTime.Today);
+        var neat = MetabolicCalculatorService.EstimateNeatCompensation(_logSteps);
+
+        var log = new NeatLog
+        {
+            Id = Guid.NewGuid(),
+            UserId = CurrentUser.UserId,
+            Date = date,
+            StepCount = _logSteps,
+            EstimatedNeatKcal = neat.CurrentNeatKcal,
+            CompensationPercent = neat.CompensationPercent,
+            Notes = _logNotes
+        };
+
+        Db.NeatLogs.Add(log);
+        await Db.SaveChangesAsync();
+
+        _showLog = false;
+        await LoadData();
+        Snackbar.Add("Steps logged", Severity.Success);
+    }
+}
