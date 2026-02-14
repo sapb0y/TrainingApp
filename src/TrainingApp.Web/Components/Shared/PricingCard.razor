@@ -23,7 +23,7 @@
     {
         <p class="fs-pricing-note">@Note</p>
     }
-    <a href="mailto:beta@fitspirals.com?subject=FitSpiralS Beta Application" class="@(Highlighted ? "fs-btn-primary" : "fs-btn-secondary")">Apply for Beta</a>
+    <BetaApplyButton CssClass="@(Highlighted ? "fs-btn-primary" : "fs-btn-secondary")" PreselectedTier="@TierName" />
 </div>
 
 @code {

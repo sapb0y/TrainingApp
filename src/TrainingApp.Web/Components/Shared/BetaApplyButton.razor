@@ -1,0 +1,92 @@
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<button class="@CssClass" @onclick="Open">@Text</button>
+
+@if (_open)
+{
+    <div class="fs-beta-overlay" @onclick="Close">
+        <div class="fs-beta-modal" @onclick:stopPropagation="true">
+            <h2>Apply for the Beta</h2>
+            <p class="fs-beta-subtitle">Tell us about yourself. We'll be in touch.</p>
+
+            <div class="fs-form-group">
+                <label>Name *</label>
+                <input @bind="_name" placeholder="Your name" />
+            </div>
+
+            <div class="fs-form-group">
+                <label>Email *</label>
+                <input type="email" @bind="_email" placeholder="you@example.com" />
+            </div>
+
+            <div class="fs-form-group">
+                <label>Tier Interest</label>
+                <select @bind="_tier">
+                    <option value="Athlete">Athlete</option>
+                    <option value="Competitor">Competitor</option>
+                    <option value="Coach">Coach</option>
+                </select>
+            </div>
+
+            <div class="fs-form-group">
+                <label>About you & why you're interested</label>
+                <textarea @bind="_bio" rows="4" placeholder="What do you lift? How do you train? What are you tired of?"></textarea>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <p class="fs-beta-error">@_error</p>
+            }
+
+            <div class="fs-beta-actions">
+                <button class="fs-btn-secondary" @onclick="Close">Cancel</button>
+                <button class="fs-btn-primary" @onclick="Submit">Send Application</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string CssClass { get; set; } = "fs-btn-primary fs-pulse-glow";
+    [Parameter] public string Text { get; set; } = "Apply for the Beta";
+    [Parameter] public string? PreselectedTier { get; set; }
+
+    private bool _open;
+    private string _name = "";
+    private string _email = "";
+    private string _tier = "Athlete";
+    private string _bio = "";
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(PreselectedTier))
+            _tier = PreselectedTier;
+    }
+
+    private void Open() => _open = true;
+
+    private void Close()
+    {
+        _open = false;
+        _error = null;
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_email))
+        {
+            _error = "Name and email are required.";
+            return;
+        }
+
+        var subject = Uri.EscapeDataString("FitSpiralS Beta Application");
+        var body = Uri.EscapeDataString(
+            $"Name: {_name}\nEmail: {_email}\nTier: {_tier}\n\n{_bio}");
+        var mailto = $"mailto:beta@fitspirals.com?subject={subject}&body={body}";
+
+        await JS.InvokeVoidAsync("open", mailto, "_self");
+        Close();
+    }
+}

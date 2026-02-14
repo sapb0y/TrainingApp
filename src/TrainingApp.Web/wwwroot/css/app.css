@@ -1376,6 +1376,89 @@ a:hover { text-decoration: underline; }
 }
 
 /* ============================================
+   BETA APPLY MODAL
+   ============================================ */
+.fs-beta-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.fs-beta-modal {
+    background: var(--fs-dark);
+    border: 1px solid var(--fs-border);
+    border-radius: var(--fs-radius);
+    padding: 40px 36px 32px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.fs-beta-modal h2 {
+    margin: 0 0 4px;
+    font-size: 1.5rem;
+}
+
+.fs-beta-subtitle {
+    color: var(--fs-muted);
+    font-size: 0.9rem;
+    margin: 0 0 24px;
+}
+
+.fs-beta-modal select,
+.fs-beta-modal textarea {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--fs-black);
+    border: 1px solid var(--fs-border);
+    border-radius: 8px;
+    color: var(--fs-white);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.fs-beta-modal select:focus,
+.fs-beta-modal textarea:focus {
+    border-color: var(--fs-purple);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.fs-beta-modal textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.fs-beta-modal textarea::placeholder {
+    color: #555;
+}
+
+.fs-beta-error {
+    color: var(--fs-pink);
+    font-size: 0.85rem;
+    margin: 0 0 12px;
+}
+
+.fs-beta-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.fs-beta-actions button {
+    padding: 12px 28px;
+    font-size: 0.95rem;
+}
+
+/* ============================================
    A11Y — Reduced Motion
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
