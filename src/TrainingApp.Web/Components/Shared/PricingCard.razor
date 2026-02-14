@@ -4,7 +4,14 @@
         <div class="fs-pricing-badge">Most Popular</div>
     }
     <p class="fs-pricing-tier">@TierName</p>
-    <p class="fs-pricing-price">$@Price<span>/mo</span></p>
+    @if (!string.IsNullOrEmpty(Tagline))
+    {
+        <p class="fs-pricing-tagline">@Tagline</p>
+    }
+    @if (Price > 0)
+    {
+        <p class="fs-pricing-price">$@Price<span>/mo</span></p>
+    }
     <div class="fs-pricing-divider"></div>
     <ul class="fs-pricing-features">
         @foreach (var feature in Features)
@@ -12,13 +19,19 @@
             <li><span class="fs-pricing-check">✓</span> @feature</li>
         }
     </ul>
-    <a href="/register" class="@(Highlighted ? "fs-btn-primary" : "fs-btn-secondary")">Start 30-Day Trial</a>
+    @if (!string.IsNullOrEmpty(Note))
+    {
+        <p class="fs-pricing-note">@Note</p>
+    }
+    <a href="mailto:beta@fitspirals.com?subject=FitSpiralS Beta Application" class="@(Highlighted ? "fs-btn-primary" : "fs-btn-secondary")">Apply for Beta</a>
 </div>
 
 @code {
     [Parameter] public string TierName { get; set; } = "";
+    [Parameter] public string? Tagline { get; set; }
     [Parameter] public int Price { get; set; }
     [Parameter] public List<string> Features { get; set; } = [];
     [Parameter] public bool Highlighted { get; set; }
     [Parameter] public int Delay { get; set; } = 1;
+    [Parameter] public string? Note { get; set; }
 }
