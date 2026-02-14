@@ -1,5 +1,6 @@
 @rendermode InteractiveServer
-@inject IJSRuntime JS
+@using TrainingApp.Core.Interfaces
+@inject IEmailService EmailService
 
 <button class="@CssClass" @onclick="Open">@Text</button>
 
@@ -7,42 +8,55 @@
 {
     <div class="fs-beta-overlay" @onclick="Close">
         <div class="fs-beta-modal" @onclick:stopPropagation="true">
-            <h2>Apply for the Beta</h2>
-            <p class="fs-beta-subtitle">Tell us about yourself. We'll be in touch.</p>
-
-            <div class="fs-form-group">
-                <label>Name *</label>
-                <input @bind="_name" placeholder="Your name" />
-            </div>
-
-            <div class="fs-form-group">
-                <label>Email *</label>
-                <input type="email" @bind="_email" placeholder="you@example.com" />
-            </div>
-
-            <div class="fs-form-group">
-                <label>Tier Interest</label>
-                <select @bind="_tier">
-                    <option value="Athlete">Athlete</option>
-                    <option value="Competitor">Competitor</option>
-                    <option value="Coach">Coach</option>
-                </select>
-            </div>
-
-            <div class="fs-form-group">
-                <label>About you & why you're interested</label>
-                <textarea @bind="_bio" rows="4" placeholder="What do you lift? How do you train? What are you tired of?"></textarea>
-            </div>
-
-            @if (!string.IsNullOrEmpty(_error))
+            @if (_submitted)
             {
-                <p class="fs-beta-error">@_error</p>
+                <h2>Application sent!</h2>
+                <p class="fs-beta-subtitle">Thanks, @_name. We'll be in touch soon.</p>
+                <div class="fs-beta-actions">
+                    <button class="fs-btn-primary" @onclick="Close">Close</button>
+                </div>
             }
+            else
+            {
+                <h2>Apply for the Beta</h2>
+                <p class="fs-beta-subtitle">Tell us about yourself. We'll be in touch.</p>
 
-            <div class="fs-beta-actions">
-                <button class="fs-btn-secondary" @onclick="Close">Cancel</button>
-                <button class="fs-btn-primary" @onclick="Submit">Send Application</button>
-            </div>
+                <div class="fs-form-group">
+                    <label>Name *</label>
+                    <input @bind="_name" placeholder="Your name" />
+                </div>
+
+                <div class="fs-form-group">
+                    <label>Email *</label>
+                    <input type="email" @bind="_email" placeholder="you@example.com" />
+                </div>
+
+                <div class="fs-form-group">
+                    <label>Tier Interest</label>
+                    <select @bind="_tier">
+                        <option value="Athlete">Athlete</option>
+                        <option value="Competitor">Competitor</option>
+                        <option value="Coach">Coach</option>
+                    </select>
+                </div>
+
+                <div class="fs-form-group">
+                    <label>About you & why you're interested</label>
+                    <textarea @bind="_bio" rows="4" placeholder="What do you lift? How do you train? What are you tired of?"></textarea>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <p class="fs-beta-error">@_error</p>
+                }
+
+                <div class="fs-beta-actions">
+                    <button class="fs-btn-secondary" @onclick="Close">Cancel</button>
+                    <button class="fs-btn-primary" @onclick="Submit" disabled="@_sending">
+                        @(_sending ? "Sending..." : "Send Application")
+                    </button>
+                </div>
+            }
         </div>
     </div>
 }
@@ -53,6 +67,8 @@
     [Parameter] public string? PreselectedTier { get; set; }
 
     private bool _open;
+    private bool _sending;
+    private bool _submitted;
     private string _name = "";
     private string _email = "";
     private string _tier = "Athlete";
@@ -65,7 +81,11 @@
             _tier = PreselectedTier;
     }
 
-    private void Open() => _open = true;
+    private void Open()
+    {
+        _open = true;
+        _submitted = false;
+    }
 
     private void Close()
     {
@@ -81,12 +101,21 @@
             return;
         }
 
-        var subject = Uri.EscapeDataString("FitSpiralS Beta Application");
-        var body = Uri.EscapeDataString(
-            $"Name: {_name}\nEmail: {_email}\nTier: {_tier}\n\n{_bio}");
-        var mailto = $"mailto:beta@fitspirals.com?subject={subject}&body={body}";
+        _sending = true;
+        _error = null;
 
-        await JS.InvokeVoidAsync("open", mailto, "_self");
-        Close();
+        try
+        {
+            await EmailService.SendBetaApplicationAsync(_name, _email, _tier, _bio);
+            _submitted = true;
+        }
+        catch
+        {
+            _error = "Something went wrong. Please try again.";
+        }
+        finally
+        {
+            _sending = false;
+        }
     }
 }

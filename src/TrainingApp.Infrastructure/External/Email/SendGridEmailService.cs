@@ -48,6 +48,11 @@ public class SendGridEmailService : IEmailService
             $"Hi {name},",
             $"Your coach application was not approved.{(reason is not null ? $" Reason: {reason}" : "")} You can reapply at any time."));
 
+    public Task SendBetaApplicationAsync(string name, string email, string tier, string bio, CancellationToken ct = default) =>
+        SendAsync("info@fitspirals.com", $"Beta Application — {name} ({tier})", BuildHtml(
+            $"New Beta Application from {name}",
+            $"<b>Email:</b> {email}<br/><b>Tier:</b> {tier}<br/><br/>{bio}"));
+
     private async Task SendAsync(string toEmail, string subject, string htmlContent)
     {
         if (!_settings.Enabled)

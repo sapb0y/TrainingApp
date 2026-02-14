@@ -8,4 +8,5 @@ public interface IEmailService
     Task SendPaymentFailedAsync(string email, string name, CancellationToken ct = default);
     Task SendCoachApprovedAsync(string email, string name, CancellationToken ct = default);
     Task SendCoachRejectedAsync(string email, string name, string? reason, CancellationToken ct = default);
+    Task SendBetaApplicationAsync(string name, string email, string tier, string bio, CancellationToken ct = default);
 }
