@@ -616,6 +616,20 @@ a:hover { text-decoration: underline; }
     color: var(--fs-muted);
 }
 
+.fs-pricing-tagline {
+    font-size: 0.9rem;
+    color: var(--fs-muted);
+    margin: 0 0 12px;
+    font-style: italic;
+}
+
+.fs-pricing-note {
+    font-size: 0.85rem;
+    color: var(--fs-purple);
+    margin: 12px 0 0;
+    font-weight: 500;
+}
+
 .fs-pricing-divider {
     height: 1px;
     background: var(--fs-border);

@@ -5,19 +5,20 @@
 <div class="fs-pricing-page">
     @* ===== HERO ===== *@
     <div class="fs-pricing-hero fs-animate">
-        <h1>Pick your plan. Start today.</h1>
-        <p>30-day free trial. No credit card. We're that confident.</p>
+        <h1>Three tiers. Launching April 2026.</h1>
+        <p>Built for lifters, competitors, and coaches. Pricing announced at launch.</p>
     </div>
 
     @* ===== PRICING CARDS ===== *@
     <div class="fs-pricing" style="padding-top:0;">
         <div class="fs-pricing-grid">
-            <PricingCard TierName="Athlete" Price="19" Delay="1"
-                Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight tracking", "Body composition"])" />
-            <PricingCard TierName="Competitor" Price="44" Highlighted="true" Delay="2"
-                Features="@(["Everything in Athlete", "Advanced analytics & charts", "Training partners", "Shared sessions", "Goal tracking & insights", "CSV/JSON data export"])" />
-            <PricingCard TierName="Coach" Price="99" Delay="3"
-                Features="@(["Everything in Competitor", "Up to 50 athletes", "Alert engine (6 types)", "Program generation for athletes", "Coach dashboard & notes", "Athlete progress overview"])" />
+            <PricingCard TierName="Athlete" Price="0" Delay="1" Tagline="For the dedicated lifter"
+                Features="@(["Periodized programs", "RPE autoregulation", "Fatigue modeling", "Basic analytics", "Weight & body comp"])" />
+            <PricingCard TierName="Competitor" Price="0" Highlighted="true" Delay="2" Tagline="For the serious competitor"
+                Features="@(["Everything in Athlete", "Advanced analytics & charts", "Training partners", "Goal tracking & insights", "Data export"])" />
+            <PricingCard TierName="Coach" Price="0" Delay="3" Tagline="For coaches who build champions"
+                Note="Free when you maintain 20+ client subscriptions"
+                Features="@(["Everything in Competitor", "Unlimited athletes", "Alert engine (6 types)", "Program gen for athletes", "Coach dashboard & notes"])" />
         </div>
     </div>
 
@@ -26,16 +27,23 @@
         <h2>Questions? Answers.</h2>
 
         <details>
-            <summary>What happens after my 30-day trial?</summary>
+            <summary>When does FitSpiralS launch?</summary>
             <div class="fs-faq-answer">
-                You pick a plan and keep training. If you don't, your data stays safe — we don't delete anything. You just lose access to premium features until you subscribe.
+                April 2026. Beta testers get early access before public launch.
             </div>
         </details>
 
         <details>
-            <summary>Can I switch plans later?</summary>
+            <summary>How do I get into the beta?</summary>
             <div class="fs-faq-answer">
-                Absolutely. Upgrade or downgrade anytime through the billing portal. Changes take effect at your next billing cycle.
+                Email us at beta@fitspirals.com. Tell us what you lift and what you're tired of in training apps. We're looking for serious lifters and coaches who want to shape the product.
+            </div>
+        </details>
+
+        <details>
+            <summary>What do beta testers get?</summary>
+            <div class="fs-faq-answer">
+                Full access to every feature before anyone else. Direct input into what we build. And the satisfaction of knowing you helped shape something worth using.
             </div>
         </details>
 
@@ -49,29 +57,22 @@
         <details>
             <summary>How does the coach platform work?</summary>
             <div class="fs-faq-answer">
-                Coaches can invite athletes, monitor their training via dashboards, set up 6 types of automated alerts, generate programs, and add contextual notes — all remotely.
+                Coaches can invite unlimited athletes, monitor training via dashboards, set up 6 types of automated alerts, generate programs, and add contextual notes — all remotely. Free when you maintain 20+ client subscriptions.
             </div>
         </details>
 
         <details>
-            <summary>Do I need a credit card to start?</summary>
+            <summary>Is there a commitment?</summary>
             <div class="fs-faq-answer">
-                Nope. 30 days free, no card required. We'll remind you before the trial ends.
-            </div>
-        </details>
-
-        <details>
-            <summary>Why 30 days free?</summary>
-            <div class="fs-faq-answer">
-                Most apps give 7. We give you a full mesocycle — enough time to run a real program, see real adaptation, and decide if this is how you want to train.
+                No. Your data is always exportable. No annual lock-in. No contracts.
             </div>
         </details>
     </section>
 
     @* ===== FINAL CTA ===== *@
     <section class="fs-cta">
-        <h2 class="fs-animate">30 days free. Train with intent.</h2>
-        <p class="fs-animate fs-delay-1">Cancel if we're wrong.</p>
-        <a href="/register" class="fs-btn-primary fs-pulse-glow fs-animate fs-delay-2">Start Your Free 30 Days</a>
+        <h2 class="fs-animate">Be first. Apply for early access.</h2>
+        <p class="fs-animate fs-delay-1">April 2026. Spots are limited.</p>
+        <a href="mailto:beta@fitspirals.com?subject=FitSpiralS Beta Application" class="fs-btn-primary fs-pulse-glow fs-animate fs-delay-2">Apply for Early Access</a>
     </section>
 </div>
